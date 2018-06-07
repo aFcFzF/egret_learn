@@ -1,0 +1,35 @@
+{
+  "engineVersion": "5.2.0",
+  "compilerVersion": "5.2.0",
+  "template": {},
+  "target": {
+    "current": "web"
+  },
+  "modules": [
+    {
+      "name": "egret"
+    },
+    {
+      "name": "game"
+    },
+    {
+      "name": "tween"
+    },
+    {
+      "name": "assetsmanager"
+    },
+    {
+      "name": "promise"
+    },
+    {
+      "name": "particle",
+      "path": "./libsrc"
+    }
+  ],
+  "targets": {
+    "android": {
+      "appname": "aaa",
+      "packagename": "com.companyname"
+    }
+  }
+}

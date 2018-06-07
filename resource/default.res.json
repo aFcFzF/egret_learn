@@ -1,0 +1,45 @@
+{
+	"groups": [
+		{
+			"keys": "bg_jpg,egret_icon_png,description_json,tetris_bg_bmp,stone_png,t_json,stoneDown_json",
+			"name": "preload"
+		}
+	],
+	"resources": [
+		{
+			"url": "assets/bg.jpg",
+			"type": "image",
+			"name": "bg_jpg"
+		},
+		{
+			"url": "assets/egret_icon.png",
+			"type": "image",
+			"name": "egret_icon_png"
+		},
+		{
+			"url": "config/description.json",
+			"type": "json",
+			"name": "description_json"
+		},
+		{
+			"url": "assets/tetris_bg.bmp",
+			"type": "image",
+			"name": "tetris_bg_bmp"
+		},
+		{
+			"url": "assets/stone.png",
+			"type": "image",
+			"name": "stone_png"
+		},
+		{
+			"url": "assets/t.json",
+			"type": "json",
+			"name": "t_json"
+		},
+		{
+			"url": "assets/stoneDown.json",
+			"type": "json",
+			"name": "stoneDown_json"
+		}
+	]
+}

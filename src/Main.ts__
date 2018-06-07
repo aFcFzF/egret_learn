@@ -1,0 +1,294 @@
+/**
+ * @file 主文件
+*/
+
+class Main extends egret.DisplayObjectContainer {
+
+    public constructor() {
+        super();
+        this.addEventListener(
+            egret.Event.ADDED_TO_STAGE, 
+            this.onAddToStage,
+            this
+        );
+    }
+
+    private s: egret.Shape;
+
+    private ang: number = 0;
+
+    private r: number = 30;
+
+    private tapHandler(evt: egret.Event): void {
+        console.log('点击了', evt);
+        this.s.graphics.clear();
+    }
+
+    private onAddToStage(evt: egret.Event) {
+        // console.log('场景已经添加', evt);
+        // this.createRect();
+        // this.createGrid();
+        // this.createSpr();
+
+        // this.stage.frameRate = 10;
+
+        // this.addEventListener(
+        //     egret.Event.ENTER_FRAME,
+        //     this.move,
+        //     this
+        // );
+
+        this.removeEventListener(egret.Event.ADDED_TO_STAGE, this.onAddToStage, this);
+        RES.addEventListener(RES.ResourceEvent.CONFIG_COMPLETE, this.configcom, this);
+        RES.loadConfig('resource/default.res.json', 'resource/');
+
+    }
+
+    private configcom(evt: RES.ResourceEvent) {
+        RES.removeEventListener(RES.ResourceEvent.CONFIG_COMPLETE, this.configcom, this);
+        RES.addEventListener(RES.ResourceEvent.GROUP_COMPLETE, this.onResourceLoadComplete, this);
+        RES.loadGroup('preload');
+    }
+
+    private onResourceLoadComplete(evt: RES.ResourceEvent): void {
+        RES.removeEventListener(RES.ResourceEvent.GROUP_COMPLETE, this.onResourceLoadComplete, this);
+        this.init();
+    }
+
+    private init(): void {
+        // const bmp: egret.Bitmap = new egret.Bitmap();
+        // bmp.texture = RES.getRes('tetris_bg_bmp');
+        // bmp.fillMode = egret.BitmapFillMode.REPEAT;
+        const bmp = new egret.Bitmap(RES.getRes('tetris_bg_bmp'));
+        bmp.fillMode = egret.BitmapFillMode.SCALE;
+        const glowFilter: egret.GlowFilter = new egret.GlowFilter(0xee1100, .6, 100, 100, 2, egret.BitmapFilterQuality.HIGH, true, false)
+        // bmp.width = 400;
+        // bmp.height = 400;
+        this.filters = [glowFilter];
+        let a = true;
+        // egret.setInterval(_ => {
+        //     console.log('哈哈')
+        //     a ? this.filters.pop() : this.filters.push(glowFilter);
+        //     a = !a;
+        // }, this, 1000);
+        bmp.width = this.$stage.stageWidth;
+        bmp.height = this.$stage.stageHeight;
+
+        // const rect: egret.Rectangle = new egret.Rectangle(50, 50, 400, 300);
+        // bmp.mask = rect;
+        // const collide = this.hitTestPoint(30, 30);
+        // console.log('碰撞： ', collide);
+        this.addChild(bmp);
+        // this.addText('文字测试', 30, 20);
+        this.createIpt();
+        this.animate();
+        this.createPriticle();
+        this.timerFn();
+    }
+
+    private addText (text: string = "", x: number = 0, y: number = 0): void {
+        const o = new egret.TextField();
+        o.x = x;
+        o.y = y;
+        o.textColor = 0xee1100;
+        o.size = 50;
+        o.fontFamily = "Microsoft YaHei";
+        o.border = true;
+        o.borderColor = 0xffffff;
+        o.strokeColor = 0xeeeeee;
+        o.stroke = 3;
+        o.italic = true;
+        const h = (new egret.HtmlTextParser).parse(
+            '<a href="event:text event link" target="_blank" style="color: #eee; font-size: 30px;">跳转链接</a>' + 
+            '<a href="event:text event link1" target="_blank" style="color: #eee; font-size: 30px;">跳转链接</a>'
+        );
+        console.log('解析html', h);
+        o.textFlow = <Array<egret.ITextElement>>[
+            {
+                text: "来者可是诸葛孔明\n",
+                style: {size: 32, textColor: 0xee1100}
+            },
+            {
+                text: '正是!\n',
+                style: {size: 40, textColor: 0x11ee00}
+            },
+            {
+                text: '久闻公之大名，今日有幸相会\n',
+                style: {size: 32, textColor: 0xee1100}
+            }
+        ];
+        o.textFlow = h;
+        o.touchEnabled = true;
+        o.addEventListener(egret.TextEvent.LINK, function(evt: egret.TextEvent) {
+            console.log(evt.text);
+        }, this);
+        this.addChild(o);
+    }
+
+    private createIpt() :void {
+        const l = new egret.TextField;
+        l.text = '用户名';
+        l.x = 10;
+        l.y = 10;
+        this.addChild(l);
+
+        const i = new egret.TextField;
+        i.text = '';
+        i.x = 100;
+        i.y = 10;
+        i.textColor = 0;
+        i.width = 140;
+        i.height = 35;
+        i.border = true;
+        i.borderColor = 0xcccccc;
+        i.background = true;
+        i.backgroundColor = 0xffffff;
+        i.type = egret.TextFieldType.INPUT;
+        this.addChild(i);
+    }
+
+    private animate(): void {
+        const s = new egret.Sprite();
+        const g = s.$graphics;
+        s.x = 100;
+        s.y = 100;
+        g.beginFill(0xffffff);
+        g.lineStyle(4, 0xee1100);
+        g.drawRoundRect(0, 0, 300, 300, 3, 30);
+        g.endFill();
+        this.addChild(s);
+
+        const shp = new egret.Shape();
+        const gr = shp.graphics;
+        shp.x = 10;
+        shp.y = 10;
+        gr.beginFill(0xcccccc);
+        gr.lineStyle(4, 0x00ee00);
+        gr.drawRect(0, 0, 100, 100);
+        gr.endFill();
+        s.addChild(shp);
+
+        const a = function() {
+            egret.Tween.get(shp)
+            .to({x: 150}, 1000, egret.Ease.backInOut)
+            .to({y: 150}, 800, egret.Ease.backInOut)
+            .to({x: 0}, 600, egret.Ease.backInOut)
+            .to({y: 0}, 400, egret.Ease.backInOut)
+            .call(a);
+        }
+        a();
+    }
+
+    private createPriticle() {
+        const texture = RES.getRes('stone_png');
+        const config = RES.getRes('stoneDown_json');
+        const part = new particle.GravityParticleSystem(texture, config);
+        this.addChild(part);
+        part.start();
+    }
+
+    private timerFn() {
+        console.log('添加了');
+        const timer:egret.Timer = new egret.Timer(1000, 5);
+        timer.addEventListener(egret.TimerEvent.TIMER, function(e:egret.TimerEvent) {
+            console.log('定时器事件', e);
+            // timer.delay = 100;
+            // timer.repeatCount = 15;
+        }, this);
+        timer.addEventListener(egret.TimerEvent.TIMER_COMPLETE, function(e: egret.TimerEvent) {
+            console.log('定时器执行完毕', e);
+        }, this);
+        // timer.start();
+
+        // egret.Ticker.getInstance().register(function(delta: number) {
+        //     console.log('祯？ ', delta);
+        // }, this);
+
+        const tmp: any = {
+            count: 0
+        }
+        const f = function (timeStamp: number) :boolean {
+            console.log('时间戳', timeStamp);
+            tmp.count++ < 100 ? console.log(timeStamp) : egret.stopTick(f, null);
+            return false;
+        }
+        // egret.startTick(f, null);
+
+        console.log('启动了多久? ', egret.getTimer());
+        // egret.getDefinitionByName
+        (new ABC).sayName();
+    }
+
+    private createRect() {
+        this.s = new egret.Shape();
+        const g = this.s.graphics;
+        g.beginFill(0xe10); // 这是要填充颜色
+        g.lineStyle(10, 0xee1100);  // lineStyle 是要设置边框
+        g.drawRect(0, 0, 300, 300); // drawRect 是要绘制方形
+        g.endFill(); // endFill 是结束填充
+        this.s.x = 80;
+        this.s.y = 80;
+
+        this.s.touchEnabled = true;
+        this.s.addEventListener(
+            egret.TouchEvent.TOUCH_TAP,
+            this.tapHandler,
+            this
+        );
+        console.log('检测', this.s.addEventListener, egret.TouchEvent.TOUCH_TAP, this.tapHandler)
+
+        this.addChild(this.s);
+    }
+
+    private createGrid() {
+        const g = this.s.graphics;
+        g.beginFill(0x1100ee);
+        g.lineStyle(1, 0x000000);
+        g.drawRoundRect(10, 10, 100, 100, 3);
+
+        g.beginFill(0xee0011);
+        g.lineStyle(1, 0x000000);
+        g.drawRoundRect(120, 10, 100, 100, 3);
+
+        g.beginFill(0x11eeee);
+        g.lineStyle(1, 0x000000);
+        g.drawRoundRect(10, 120, 100, 100, 3);
+
+        g.beginFill(0x11ee00);
+        g.lineStyle(1, 0x000000);
+        g.drawRoundRect(120, 120, 100, 100, 3);
+
+        g.endFill();
+    }
+
+    private move(evt:egret.Event) {
+        this.s.x = 50 + Math.cos( this.ang * Math.PI / 180) * this.r;
+        this.s.y = 50 + Math.cos( this.ang * Math.PI / 180) * this.r;
+        this.ang++;
+    }
+
+    private createSpr(): void {
+        const spr:egret.Sprite = new egret.Sprite();
+        spr.graphics.beginFill(0xeeeeee);
+        spr.graphics.lineStyle(4, 0x666666);
+        spr.graphics.drawRect(0, 0, 120, 120);
+        spr.graphics.endFill();
+
+        spr.x = 300;
+        spr.y = 300;
+        this.addChild(spr);
+
+        const spr1:egret.Sprite = new egret.Sprite();
+        const g = spr1.graphics;
+        g.beginFill(0xccc);
+        g.lineStyle(4, 0x666666);
+        g.drawRect(10, 10, 120, 120);
+        g.endFill();
+
+        spr1.x = 10;
+        spr1.y = 10;
+        this.addChild(spr1);
+
+        spr.addChild(spr1);
+    }
+}
