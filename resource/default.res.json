@@ -1,7 +1,7 @@
 {
 	"groups": [
 		{
-			"keys": "bg_jpg,egret_icon_png,description_json,tetris_bg_bmp,stone_png,t_json,stoneDown_json",
+			"keys": "bg_jpg,egret_icon_png,description_json,stone_png,t_json,stoneDown_json,aa_json,tetris_bg_jpg,bg_test_png,bg_test2_png,preDefine_json",
 			"name": "preload"
 		}
 	],
@@ -22,9 +22,10 @@
 			"name": "description_json"
 		},
 		{
-			"url": "assets/tetris_bg.bmp",
+			"url": "assets/tetris_bg.jpg",
 			"type": "image",
-			"name": "tetris_bg_bmp"
+			"name": "tetris_bg_jpg",
+			"scale9grid": "40,43,216,457"
 		},
 		{
 			"url": "assets/stone.png",
@@ -40,6 +41,31 @@
 			"url": "assets/stoneDown.json",
 			"type": "json",
 			"name": "stoneDown_json"
+		},
+		{
+			"url": "assets/aa.json",
+			"type": "json",
+			"name": "aa_json"
+		},
+		{
+			"url": "assets/bg.png",
+			"type": "image",
+			"name": "bg_png"
+		},
+		{
+			"url": "assets/bg_test.png",
+			"type": "image",
+			"name": "bg_test_png"
+		},
+		{
+			"name": "bg_test2_png",
+			"type": "image",
+			"url": "assets/bg_test.png"
+		},
+		{
+			"name": "preDefine_json",
+			"type": "json",
+			"url": "assets/preDefine.json"
 		}
 	]
 }
