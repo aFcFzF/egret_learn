@@ -231,6 +231,14 @@ class Main extends egret.DisplayObjectContainer {
     */
     private i: number = 0;
 
+    private interval: number = 0;
+
+    public repeatProc (proc: Function): boolean {
+        this.interval++ % 2 === 0  && proc.call(this);
+        this.interval > 1e5 && (this.interval = 0);
+        return true;  
+    }
+
     public hasProc(hash) {
         let bool = false;
         this.$keyMap[hash] && (bool = true);
@@ -246,7 +254,7 @@ class Main extends egret.DisplayObjectContainer {
         (hash === 37 || hash === 39) && ck !== hash && this.$keyMap[ck] && this.stopRepeatProc(ck);
 
         if (this.$keyMap[hash]) return null;
-        this.$keyMap[hash] = proc;
+        this.$keyMap[hash] = this.repeatProc.bind(this, proc);
         egret.startTick(this.$keyMap[hash], this);
         (hash === 37 || hash === 39) && (this.$keyMap['currLorR'] = hash);
     }
@@ -302,6 +310,6 @@ class Main extends egret.DisplayObjectContainer {
 
     // keyup
     public keyUpHandler(keyCode: number): void {
-        this.stopRepeatProc(40);
+        this.stopRepeatProc(keyCode);
     }
 }
