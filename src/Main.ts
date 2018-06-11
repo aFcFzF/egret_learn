@@ -14,8 +14,8 @@ class Main extends egret.DisplayObjectContainer {
     private $pgr: egret.Graphics = null; // 方块背景（绘制）
     private $vertCount = 0; // 垂直个数
     private $per: number = 0; // 单个块的宽高
+    private $horzCount: number = 10; // 水平单个块个数
     private $baseY: number = 0; // 基准，顶点Y轴，用于求左右移动的距离
-    private $horzCount: number = 7; // 水平单个块个数
     private $tShapes: Object = null; // 所有图形的定义
     private $currTshape: string = 'z'; // 当前控制的图形
     private $currTshapeData: Array<Array<number>> = [];
@@ -23,6 +23,10 @@ class Main extends egret.DisplayObjectContainer {
     private $currTshapeIdx: number = 0; // 当前图形的下标
     private $ctrlSpr: egret.Sprite = null; // 被控制的Sripte
     private $ctrlTiles: Array<egret.Shape> = []; // 被控制的shape
+    
+    private $keyMap: Object = {
+        currLorR: null // 记录已经按下的左或右，防止冲突
+    };
 
     public init() {
         // 屏幕显示模式
@@ -31,7 +35,8 @@ class Main extends egret.DisplayObjectContainer {
         // 这里加egret.Event.RESIZE 无效
         // window.addEventListener('resize', this.paint.bind(this));
 
-        window.addEventListener('keydown', (e: KeyboardEvent) => this.keyHandler(e.keyCode));
+        window.addEventListener('keydown', (e: KeyboardEvent) => this.keyDownHandler(e.keyCode));
+        window.addEventListener('keyup', (e: KeyboardEvent) => this.keyUpHandler(e.keyCode));
 
         // 必须等load完分组，然后才load资源
         const onResourceLoadComplete = (): void => {
@@ -121,7 +126,7 @@ class Main extends egret.DisplayObjectContainer {
         });
     }
 
-    public initUi() {
+    public initUi(): void {
         // 先初始化背景
         const bg:egret.Bitmap = this.$bg = new egret.Bitmap(); 
         const texture = RES.getRes('bg_jpg');
@@ -152,7 +157,6 @@ class Main extends egret.DisplayObjectContainer {
         // 绘制具体流程，响应屏幕适配
         this.paint();
     }
-    private i: number = 0;
 
     /**
      * @param {boolean=} left 是否为左边界
@@ -163,7 +167,9 @@ class Main extends egret.DisplayObjectContainer {
         const tType = this.$currTshape;
         const idx = this.$currTshapeIdx;
         const baseY = this.$baseY;
-        const range = [...this.$currTshapeData[0]]; // range是宽度范围,要深拷贝
+        const tile0X = this.$currTshapeData[0][0]; // 这是第1个片的x轴坐标
+        const tile1X = this.$currTshapeData[1][0]; // 这是第2个片的x轴坐标
+        const range = [tile0X, tile1X]; // range是宽度范围,要深拷贝
         this.$currTshapeData.forEach(e => {
             const x = e[0];
             x < range[0] && (range[0] = x);
@@ -181,20 +187,20 @@ class Main extends egret.DisplayObjectContainer {
      * @inner
     */
     public moveLeft(): void {
-        if (!this.isBorder(true)) {
-            this.$baseY--;
-            this.$ctrlSpr.x-=this.$per;
-        }
+        if (this.isBorder(true)) return null;
+        this.$baseY--;
+        this.$ctrlSpr.x -= this.$per;
+        console.log('向左移动了', this.$baseY)
     }
 
     /**
      * 向右移一位
     */
     public moveRight(): void {
-        if (!this.isBorder(false)) {
-            this.$baseY++;
-            this.$ctrlSpr.x+=this.$per;
-        }
+        if (this.isBorder(false)) return null;
+        this.$baseY++;
+        this.$ctrlSpr.x += this.$per;
+        console.log('向右移动了', this.$baseY)
     }
 
     /**
@@ -203,64 +209,99 @@ class Main extends egret.DisplayObjectContainer {
      * @inner
     */
     public autoKick(tShapeData): void {
-        const range = [...tShapeData[0]]; // range是宽度范围,要深拷贝
+        const range = [tShapeData[0][0], tShapeData[1][0]]; // 第一个片和第二个片的坐标
         tShapeData.forEach(e => {
             const x = e[0];
             x < range[0] && (range[0] = x);
             x > range[1] && (range[1] = x);
         });
-        let tileCount = range[1] - range[0] + 1;
-        tileCount > 3 && tileCount++;
+        let tileCount = range[1] - range[0] +　1; // 加一是因为俩x坐标的差最小是1，那么至少占1格，比如长条
         this.$ctrlSpr.width = this.$per * tileCount;
         this.$ctrlSpr.height = this.$per * tileCount;
-        debugger;
-        this.$ctrlSpr.x < 0 && this.moveLeft(); // 如果sprite < 0 向右移一位
+        this.$ctrlSpr.x < 0 && this.moveRight(); // 如果sprite < 0 向右移一位
         const maxWdt = this.$per * this.$horzCount;
+        console.log('autoKick:', (this.$baseY + tileCount) * this.$per, maxWdt);
         while((this.$baseY + tileCount) * this.$per > maxWdt) { // 如果sprite + baseY
-            this.moveRight();
+            this.moveLeft();
         }
     }
 
     /**
      * 处理按键事件
     */
-    public keyHandler(keyCode: number) {
-        // let keyText: string;
-        // const keyOpt = {
-        //     37: '左',
-        //     39: '右',
-        //     38: '上',
-        //     40: '下',
-        //     88: '硬降' 
-        // };
-        // const tf:egret.TextField = new egret.TextField();
-        // tf.text = '按下了' + keyOpt[keyCode];
-        // tf.x = 10;
-        // tf.y = this.$textPos;
-        // this.$textPos+= 30;
-        // tf.size = 20;
-        // this.addChild(tf);
-        //this.$ctrlSpr.x += this.$per;
+    private i: number = 0;
+
+    public hasProc(hash) {
+        let bool = false;
+        this.$keyMap[hash] && (bool = true);
+        return bool;
+    }
+
+    /**
+     * 开始长按点击
+    */
+    public startRepeatProc(hash: number, proc: Function): void {
+        // 防止同时按下左右, 而且以最后按下的为主
+        const ck = this.$keyMap['currLorR'];
+        (hash === 37 || hash === 39) && ck !== hash && this.$keyMap[ck] && this.stopRepeatProc(ck);
+
+        if (this.$keyMap[hash]) return null;
+        this.$keyMap[hash] = proc;
+        egret.startTick(this.$keyMap[hash], this);
+        (hash === 37 || hash === 39) && (this.$keyMap['currLorR'] = hash);
+    }
+
+    /**
+     * 停止长按点击
+    */
+    public stopRepeatProc(hash: number): void {
+        if (!this.hasProc(hash)) return null; // 防止提前解决了左右冲突导致出错
+        egret.stopTick(this.$keyMap[hash], this);
+        this.$keyMap[hash] = null;
+    }
+
+    /**
+     * 处理 keydown
+     * @param keyCode {number} 按键码
+    */
+    public keyDownHandler(keyCode: number): void {
+        let i = 0;
+        const createText = () => {
+                const tf = new egret.TextField();
+                tf.x = 10;
+                tf.y = this.$textPos;
+                this.$textPos+= 5;
+                tf.text = '按下' + i++;
+                tf.size = 12;
+                this.$playground.addChild(tf);
+        };
 
         switch(keyCode) {
-            case 38:
+            case 38: // up
                 const idx = ++this.$currTshapeIdx % this.$currTshapeCount;
                 this.drawElement(this.$tShapes[this.$currTshape], idx); 
                 break;
-            case 32:  // 空格
+            case 32:  // space
                 const s = Object.keys(this.$tShapes)[this.i++];
                 this.$currTshape = s;
                 this.$currTshapeIdx = 0;
                 this.$currTshapeCount = this.$tShapes[this.$currTshape].shape.length;
                 break;
-            case 37: // 左边按钮
-                this.moveLeft();
+            case 37: // left
+                this.startRepeatProc(keyCode, this.moveLeft);
                 break;
-            case 39: 
-                this.moveRight();
+            case 39: // right
+                this.startRepeatProc(keyCode, this.moveRight);
                 break;
+            case 40: // down
+                this.startRepeatProc(keyCode, createText);
             default: 
                 break;
         }
+    }
+
+    // keyup
+    public keyUpHandler(keyCode: number): void {
+        this.stopRepeatProc(40);
     }
 }
