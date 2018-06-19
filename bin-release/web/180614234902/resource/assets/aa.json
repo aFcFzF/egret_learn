@@ -1,0 +1,9 @@
+{
+	"groups":[],
+	"resources":[{
+			"name":"tetris_bg_jpg",
+			"scale9grid":"40,43,216,457",
+			"type":"image",
+			"url":"D:/tech_work/egret_learn/resource/assets/tetris_bg.jpg"
+		}]
+}

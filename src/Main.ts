@@ -23,10 +23,50 @@ class Main extends egret.DisplayObjectContainer {
     private $currTshapeIdx: number = 0; // 当前图形的下标
     private $ctrlSpr: egret.Sprite = null; // 被控制的Sripte
     private $ctrlTiles: Array<egret.Shape> = []; // 被控制的shape
-    
-    private $keyMap: Object = {
-        currLorR: null // 记录已经按下的左或右，防止冲突
+    private $currLorR: any = null;// 记录已经按下的左或右，防止冲突
+    private $ctrlBtns: Object = {
+        '38': {
+            sprName: 'rotate',
+            spr: null,
+            bg: 'rotate_png',
+            start: false,
+            proc: null,
+            tap: null 
+        },
+        '40': {
+            sprName: 'down',
+            spr: null,
+            bg: 'down_png',
+            start: false,
+            proc: null,
+            tap: null
+        },
+        // 'undefin': {
+        //     sprName: 'hardDown',
+        //     spr: null,
+        //     bg: 'hard_down_png',
+        //     start: false,
+        //     proc: null,
+        //     tap: null
+        // },
+        '37': {
+            sprName: 'left',
+            spr: null,
+            bg: 'left_png',
+            start: false,
+            proc: null,
+            tap: null
+        },
+        '39': {
+            sprName: 'right',
+            spr: null,
+            bg: 'right_png',
+            start: false,
+            proc: null,
+            tap: null
+        }
     };
+    
 
     public init() {
         // 屏幕显示模式
@@ -66,6 +106,8 @@ class Main extends egret.DisplayObjectContainer {
             width: wdt,
             height: hgt
         });
+
+
         // 计算方块区域
         let pgrWdt = wdt - 100;
         let pgrHgt = hgt - 120;
@@ -78,23 +120,55 @@ class Main extends egret.DisplayObjectContainer {
         Object.assign(this.$playground, {
             x: 10,
             y: 10,
-            width: wdt,
-            height: hgt
+            width: pgrWdt,
+            height: pgrHgt
         });
         this.$pgr.clear();
         this.$pgr.beginFill(0x0, .3);
         this.$pgr.lineStyle(3, 0xffffff, .8);
         this.$pgr.drawRoundRect(-2, -2, pgrWdt+2, pgrHgt+2, 4);
         this.$pgr.lineStyle(1, 0xffffff, .2);
-        for (let i = 1; i < horzCount; i++) {
-            this.$pgr.moveTo(per * i - 1, 0);
-            this.$pgr.lineTo(per * i - 1, pgrHgt);
-        }
-        for (let i = 1; i < vertCount; i++) {
-            this.$pgr.moveTo(0, per * i - 1);
-            this.$pgr.lineTo(pgrWdt, per * i - 1);
-        }
         this.$pgr.endFill();
+        this.$pgr.lineStyle(0);
+        for (let d = 0; d < vertCount; d++) {
+            for (let i = 0; i < horzCount; i++) {
+                egret.startTick(() => {
+                    if (i % 5 === 0) {
+                        console.log(i * per)
+                        this.$pgr.beginFill(0x11ee00, .3);
+                        this.$pgr.drawRect(i * per, d * per, per, per);
+                        this.$pgr.endFill();
+                    }
+                    return false;
+                }, this);
+            }
+        }
+
+        // for (let i = 1; i < vertCount; i++) {
+        //     this.$pgr.beginFill(0x11ee00, .3);
+        //     this.$pgr.moveTo(0, per * i - 1);
+        //     this.$pgr.drawRect(0, 0, per, per);
+        //     // this.$pgr.moveTo(0, per * i - 1);
+        //     // this.$pgr.lineTo(pgrWdt, per * i - 1);
+        // }
+
+        // 适配控制按钮 - 按钮组
+        const ctrlGroup = this.getChildByName('btnGroup');
+        ctrlGroup.width = wdt - 20;
+        const span = ~~((ctrlGroup.width - 4 * 80) / 5);
+        ctrlGroup.height = 2 * 80 + span;
+        ctrlGroup.x = 10;
+        ctrlGroup.y = ~~(pgrHgt + 10 + (hgt - 10 - pgrHgt) / 2) - ~~((ctrlGroup.height - span) * 3 / 4) - 10;
+        const btnCount = 4;
+        ['37', '39', '40'].forEach((e, idx) => {
+            console.log('距离', (span + 80) * idx);
+            this.$ctrlBtns[e].spr.x = (span + 80) * idx;
+            this.$ctrlBtns[e].spr.y = span + 80;
+        });
+        this.$ctrlBtns['38'].spr.x = ctrlGroup.width - 80;
+        this.$ctrlBtns['38'].spr.y = 0;
+        
+        // 随机生成某个快
         const tShapes = this.$tShapes = RES.getRes('preDefine_json');
         const tShape = tShapes[this.$currTshape]; // 此处应然是random
         this.$currTshapeCount = tShape.shape.length;
@@ -154,6 +228,24 @@ class Main extends egret.DisplayObjectContainer {
             this.$ctrlSpr.addChild(tile);
         }
 
+        // 初始化按钮
+        const btnGroup = new egret.Sprite();
+        btnGroup.name = 'btnGroup';
+        Object.keys(this.$ctrlBtns).forEach(e => {
+            const btnItem = this.$ctrlBtns[e];
+            btnItem.spr = new egret.Sprite();
+            btnItem.spr.name = btnItem.sprName;
+            btnItem.bg = new egret.Bitmap(RES.getRes(this.$ctrlBtns[e].bg));
+            btnItem.bg.fillMode = egret.BitmapFillMode.SCALE;
+            btnItem.spr.width = btnItem.bg.width = 80;
+            btnItem.spr.height = btnItem.bg.height = 80;
+            btnItem.spr.touchEnabled = true;
+            btnItem.spr.addEventListener(egret.TouchEvent.TOUCH_BEGIN, this.keyDownHandler.bind(this, +e), this);
+            btnItem.spr.addEventListener(egret.TouchEvent.TOUCH_END, this.keyUpHandler.bind(this, +e), this);
+            btnItem.spr.addChild(btnItem.bg);
+            btnGroup.addChild(btnItem.spr);
+        });
+        this.addChild(btnGroup);
         // 绘制具体流程，响应屏幕适配
         this.paint();
     }
@@ -239,51 +331,65 @@ class Main extends egret.DisplayObjectContainer {
         return true;  
     }
 
-    public hasProc(hash) {
-        let bool = false;
-        this.$keyMap[hash] && (bool = true);
-        return bool;
+    /**
+     * 检测是否已经连击
+    */
+    public hasRepeat(hash) {
+        return !!this.$ctrlBtns[hash].start;
     }
 
     /**
      * 开始长按点击
     */
+    private tms: number = 0;
     public startRepeatProc(hash: number, proc: Function): void {
+        if (this.$ctrlBtns[hash].start) return null;
         // 防止同时按下左右, 而且以最后按下的为主
-        const ck = this.$keyMap['currLorR'];
-        (hash === 37 || hash === 39) && ck !== hash && this.$keyMap[ck] && this.stopRepeatProc(ck);
-
-        if (this.$keyMap[hash]) return null;
-        this.$keyMap[hash] = this.repeatProc.bind(this, proc);
-        egret.startTick(this.$keyMap[hash], this);
-        (hash === 37 || hash === 39) && (this.$keyMap['currLorR'] = hash);
+        (hash === 37 || hash === 39) && this.$currLorR !== hash && this.$ctrlBtns[this.$currLorR] && this.$ctrlBtns[this.$currLorR].start && this.stopRepeatProc(this.$currLorR);
+        // this.$keyMap[hash].proc = this.repeatProc.bind(this, proc);
+        // egret.startTick(this.$keyMap[hash], this);
+        proc.call(this);
+        this.tms = Date.now();
+        this.$ctrlBtns[hash].tap = egret.setTimeout(() => {
+            if (this.$ctrlBtns[hash].tap) {
+                this.$ctrlBtns[hash].proc = proc.bind(this);// this.repeatProc.bind(this, proc);
+                // egret.startTick(this.$ctrlBtns[hash].proc, this);
+                // this.$ctrlBtns[hash].start = true;
+                 this.$ctrlBtns[hash].start = egret.setInterval(() => this.$ctrlBtns[hash].start && proc.call(this), this, 20);
+                 (hash === 37 || hash === 39) && (this.$currLorR = hash);
+            }
+        }, this, 80);
+        
     }
 
     /**
      * 停止长按点击
     */
     public stopRepeatProc(hash: number): void {
-        if (!this.hasProc(hash)) return null; // 防止提前解决了左右冲突导致出错
-        egret.stopTick(this.$keyMap[hash], this);
-        this.$keyMap[hash] = null;
+        this.createText.call(this, Date.now() - this.tms)
+        egret.clearTimeout(this.$ctrlBtns[hash].tap);
+        this.$ctrlBtns[hash].tap = null;
+        if (!this.hasRepeat(hash)) return null; // 防止提前解决了左右冲突导致出错
+        // egret.stopTick(this.$ctrlBtns[hash].proc, this);
+        // this.$ctrlBtns[hash].start = false;
+        this.$ctrlBtns[hash].start && egret.clearInterval(this.$ctrlBtns[hash].start);
+        this.$ctrlBtns[hash].start = false;
     }
 
+    public createText(text) {
+        const tf = new egret.TextField();
+        tf.x = 0;
+        tf.y = this.$textPos;
+        this.$textPos+= 20;
+        tf.text = '按下' + text;
+        tf.size = 14;
+        this.$playground.addChild(tf);
+    }
     /**
      * 处理 keydown
      * @param keyCode {number} 按键码
     */
     public keyDownHandler(keyCode: number): void {
-        let i = 0;
-        const createText = () => {
-                const tf = new egret.TextField();
-                tf.x = 10;
-                tf.y = this.$textPos;
-                this.$textPos+= 5;
-                tf.text = '按下' + i++;
-                tf.size = 12;
-                this.$playground.addChild(tf);
-        };
-
         switch(keyCode) {
             case 38: // up
                 const idx = ++this.$currTshapeIdx % this.$currTshapeCount;
@@ -302,7 +408,7 @@ class Main extends egret.DisplayObjectContainer {
                 this.startRepeatProc(keyCode, this.moveRight);
                 break;
             case 40: // down
-                this.startRepeatProc(keyCode, createText);
+                this.startRepeatProc(keyCode, this.createText);
             default: 
                 break;
         }
