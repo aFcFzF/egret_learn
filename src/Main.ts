@@ -12,18 +12,22 @@ class Main extends egret.DisplayObjectContainer {
     private $bg: egret.Bitmap = null; // 背景
     private $playground: egret.Sprite = null; // 方块区域
     private $pgr: egret.Graphics = null; // 方块背景（绘制）
+    private $gameTiles: Array<Array<string>> = []; // playground 里面的所有方块
     private $vertCount = 0; // 垂直个数
     private $per: number = 0; // 单个块的宽高
     private $horzCount: number = 10; // 水平单个块个数
-    private $baseY: number = 0; // 基准，顶点Y轴，用于求左右移动的距离
+    private $baseX: number = 0; // x轴基准, 左右距离
+    private $baseY: number = 0; // y轴基准，上下距离
     private $tShapes: Object = null; // 所有图形的定义
     private $currTshape: string = 'z'; // 当前控制的图形
-    private $currTshapeData: Array<Array<number>> = [];
+    private $currTshapeData: Array<Array<number>> = []; // 这是坐标数组
+    private $currRealPos: Array<Array<number>> = [];
     private $currTshapeCount: number = 0; // 当前图形的所有分类
     private $currTshapeIdx: number = 0; // 当前图形的下标
     private $ctrlSpr: egret.Sprite = null; // 被控制的Sripte
     private $ctrlTiles: Array<egret.Shape> = []; // 被控制的shape
-    private $currLorR: any = null;// 记录已经按下的左或右，防止冲突
+    // private $ctrlTilesPos: Array<Array<number>> = []; // 暂时没用到
+    private $currLorR: any = null; // 记录已经按下的左或右，防止冲突
     private $ctrlBtns: Object = {
         '38': {
             sprName: 'rotate',
@@ -66,6 +70,7 @@ class Main extends egret.DisplayObjectContainer {
             tap: null
         }
     };
+    private $nextList: any = null;
     
 
     public init() {
@@ -82,7 +87,12 @@ class Main extends egret.DisplayObjectContainer {
         const onResourceLoadComplete = (): void => {
             RES.removeEventListener(RES.ResourceEvent.GROUP_COMPLETE, onResourceLoadComplete, this);
             console.log('载入ui');
+
+            // 初始化ui
             this.initUi();
+
+            // 初始化逻辑
+            this.initLogic();
         }
     
         const preload = (): void => {
@@ -93,7 +103,7 @@ class Main extends egret.DisplayObjectContainer {
 
         RES.addEventListener(RES.ResourceEvent.CONFIG_COMPLETE, preload, this);
         RES.loadConfig('resource/default.res.json', 'resource/');
-        // 背景资源完毕
+
     }
 
     public paint() {
@@ -108,12 +118,12 @@ class Main extends egret.DisplayObjectContainer {
         });
 
 
-        // 计算方块区域
+        // 计算游戏区域
         let pgrWdt = wdt - 100;
         let pgrHgt = hgt - 120;
         const horzCount = this.$horzCount;
         let per = this.$per = ~~(pgrWdt / horzCount);
-        const vertCount = ~~(pgrHgt / per)
+        const vertCount = this.$vertCount = ~~(pgrHgt / per);
         pgrWdt = per * horzCount;
         pgrHgt = vertCount * per;
         console.log('宽和高： ', pgrWdt, pgrHgt);
@@ -124,33 +134,30 @@ class Main extends egret.DisplayObjectContainer {
             height: pgrHgt
         });
         this.$pgr.clear();
-        this.$pgr.beginFill(0x0, .3);
-        this.$pgr.lineStyle(3, 0xffffff, .8);
-        this.$pgr.drawRoundRect(-2, -2, pgrWdt+2, pgrHgt+2, 4);
-        this.$pgr.lineStyle(1, 0xffffff, .2);
-        this.$pgr.endFill();
-        this.$pgr.lineStyle(0);
+
+        // 绘制背景
         for (let d = 0; d < vertCount; d++) {
-            for (let i = 0; i < horzCount; i++) {
-                egret.startTick(() => {
-                    if (i % 5 === 0) {
-                        console.log(i * per)
-                        this.$pgr.beginFill(0x11ee00, .3);
-                        this.$pgr.drawRect(i * per, d * per, per, per);
-                        this.$pgr.endFill();
-                    }
-                    return false;
-                }, this);
+            for (let p = 0; p < horzCount; p++) {
+                this.$pgr.lineStyle(0);
+                (p + d) % 2 === 0 ? this.$pgr.beginFill(0x3D383E, 1) : this.$pgr.beginFill(0x4A4358, 1);   
+                this.$pgr.drawRoundRect(p * per, d * per, per, per, 3);
+                this.$pgr.endFill();
+                if (d === vertCount - 1) {
+                    this.$pgr.lineStyle(2, 0x000000, .2, false, '', '', '' , 0, [5]);
+                    this.$pgr.moveTo(per * (p + 1), 0);
+                    this.$pgr.lineTo(per * (p + 1), pgrHgt);
+                }  
             }
+                this.$pgr.lineStyle(2, 0x000000, .2, false, '', '', '' , 0, [5]);
+                this.$pgr.moveTo(0, per * (d + 1));
+                this.$pgr.lineTo(pgrWdt, per * (d + 1));
         }
 
-        // for (let i = 1; i < vertCount; i++) {
-        //     this.$pgr.beginFill(0x11ee00, .3);
-        //     this.$pgr.moveTo(0, per * i - 1);
-        //     this.$pgr.drawRect(0, 0, per, per);
-        //     // this.$pgr.moveTo(0, per * i - 1);
-        //     // this.$pgr.lineTo(pgrWdt, per * i - 1);
-        // }
+        this.$pgr.beginFill(0x0, .3);
+        this.$pgr.lineStyle(3, 0xffffff, .8);
+        this.$pgr.drawRoundRect(-2, -2, pgrWdt + 3, pgrHgt + 3, 4);
+        this.$pgr.lineStyle(1, 0xffffff, .2);
+        this.$pgr.endFill();
 
         // 适配控制按钮 - 按钮组
         const ctrlGroup = this.getChildByName('btnGroup');
@@ -168,24 +175,28 @@ class Main extends egret.DisplayObjectContainer {
         this.$ctrlBtns['38'].spr.x = ctrlGroup.width - 80;
         this.$ctrlBtns['38'].spr.y = 0;
         
-        // 随机生成某个快
-        const tShapes = this.$tShapes = RES.getRes('preDefine_json');
-        const tShape = tShapes[this.$currTshape]; // 此处应然是random
-        this.$currTshapeCount = tShape.shape.length;
-        this.drawElement(tShape, 0); // 此处idx 也应该是random
     }
-
-    public drawElement(shp, idx) {
+    /**
+     * 绘制一个teromino
+     * @param {string} char 是一个方块的元素名
+     * @param {number} num 这个是要绘制的具体旋转形态
+    */
+    public drawElement(char, idx) {
+        const shp = this.$tShapes[char];
         const per = this.$per;
         const {bg, shw, cre} = shp.color;
+        this.$currTshape = char;
         this.$currTshapeData = shp.shape[idx];
+        this.$currTshapeCount = shp.shape.length;
+        this.$currTshapeIdx = idx;
+
         // 踢墙
         this.autoKick(this.$currTshapeData);
+
         // 画tile
         this.$currTshapeData.forEach((e, i) => {
             const tile = this.$ctrlTiles[i];
             const g = tile.$graphics;
-            const baseY = this.$baseY;
             tile.x = e[0] * per;
             tile.y = e[1] * per;
             g.clear();
@@ -246,19 +257,72 @@ class Main extends egret.DisplayObjectContainer {
             btnGroup.addChild(btnItem.spr);
         });
         this.addChild(btnGroup);
+        
         // 绘制具体流程，响应屏幕适配
         this.paint();
     }
 
+    // 初始化游戏
+    public initLogic(): void {
+        const hCount = this.$horzCount;
+        const vCount = this.$vertCount;
+        const gmTilesSprite: egret.Sprite = new egret.Sprite();
+        gmTilesSprite.name = 'gmTiles';
+        const gmTiles = this.$gameTiles = Array.from({length: vCount}, (row, rowIdx) => Array.from({length: hCount}, (item, itemIdx) => {
+            const s: egret.Shape = new egret.Shape();
+            s.x = this.$per * itemIdx;
+            s.y = this.$per * rowIdx;
+            s.width = s.height = this.$per;
+            gmTilesSprite.addChild(s);
+            return null;
+        }));
+        this.$playground.addChild(gmTilesSprite);
+
+        // 随机生成某个块
+        const tShapes = this.$tShapes = RES.getRes('preDefine_json');
+        const tetrominoNames = Object.keys(tShapes);
+
+        //const tShape = tShapes[this.$currTshape]; // 此处应然是random
+        // this.$currTshapeCount = tShape.shape.length;
+
+        const nList = this.$nextList = {
+            _list: [],
+
+            dequeue() {
+                this.enqueue();
+                return this._list.shift();
+            },
+
+            enqueue() {
+                const randomChar =  tetrominoNames[~~(Math.random() * tetrominoNames.length)];
+                const len = tShapes[randomChar].shape.length;
+                const randomIdx = ~~(Math.random() * len);
+                this._list.push([randomChar, randomIdx]);
+            },
+
+            size() {
+                return this._list.length;
+            }
+        }
+
+        // 生成随方块队列-10个
+        Array.from({length: 10}, e => nList.enqueue());
+
+        const item = nList.dequeue();
+        console.log('初始化方块', item);
+        this.drawElement(item[0], item[1]);
+    }
+
+
     /**
-     * @param {boolean=} left 是否为左边界
+     * @param {boolean=} left 是否为左边界  这里是否合成一个checkPos更好呢？一个对象 {left, right, bottom}
      * @return {boolean} 是否为边界
     */
     public isBorder(left): boolean {
         if (left === undefined) throw new Error('必须指定是否检测左边界！')
         const tType = this.$currTshape;
         const idx = this.$currTshapeIdx;
-        const baseY = this.$baseY;
+        const baseX = this.$baseX;
         const tile0X = this.$currTshapeData[0][0]; // 这是第1个片的x轴坐标
         const tile1X = this.$currTshapeData[1][0]; // 这是第2个片的x轴坐标
         const range = [tile0X, tile1X]; // range是宽度范围,要深拷贝
@@ -267,22 +331,32 @@ class Main extends egret.DisplayObjectContainer {
             x < range[0] && (range[0] = x);
             x > range[1] && (range[1] = x);
         });
-        if (left && range[0] + baseY <= 0) return true;
-        if (!left && range[1] + baseY + 1 >= this.$horzCount) return true;
+        if (left && range[0] + baseX <= 0) return true;
+        if (!left && range[1] + baseX + 1 >= this.$horzCount) return true;
         return false;
+    }
+
+    /**
+     * 旋转
+    */
+    public rotate(): void {
+        if (this.checkPos()) return;
+        const idx = ++this.$currTshapeIdx % this.$currTshapeCount;
+        this.drawElement(this.$currTshape, idx); 
     }
 
     /**
      * 向左移一位
      * 1. sprite向左移一位
-     * 2. this.$baseY向左移一位，后面记得update就可以了
+     * 2. this.$baseX向左移一位，后面记得checkPos就可以了
      * @inner
     */
     public moveLeft(): void {
         if (this.isBorder(true)) return null;
-        this.$baseY--;
+        this.$baseX--;
         this.$ctrlSpr.x -= this.$per;
-        console.log('向左移动了', this.$baseY)
+        console.log('向左移动了', this.$baseX);
+        this.checkPos();
     }
 
     /**
@@ -290,9 +364,83 @@ class Main extends egret.DisplayObjectContainer {
     */
     public moveRight(): void {
         if (this.isBorder(false)) return null;
-        this.$baseY++;
+        this.$baseX++;
         this.$ctrlSpr.x += this.$per;
-        console.log('向右移动了', this.$baseY)
+        console.log('向右移动了', this.$baseX);
+        this.checkPos();
+    }
+
+    /**
+     * 向下移一位
+    */
+    public down(): void {
+        const shouldUpdate = this.checkPos();
+        shouldUpdate ? console.info('可以update了') : (this.$baseY++, this.$ctrlSpr.y += this.$per); 
+    }
+
+    /**
+     * 检查tetromino位置,判断是否update - 条件1: 触底， 条件2: 下面有块
+     * @inner
+    */
+    public checkPos(): boolean {
+        const {$currTshapeData, $baseX, $baseY, $vertCount, $gameTiles} = this;
+        const tetrominoVertRange = [$currTshapeData[0][1], $currTshapeData[1][1]];
+        const realPos = this.$currRealPos = $currTshapeData.map(e => {
+            e[1] < tetrominoVertRange[0] && (tetrominoVertRange[0] = e[1]); // 计算高度
+            e[1] > tetrominoVertRange[1] && (tetrominoVertRange[1] = e[1]);
+            return [e[0] + $baseX, e[1] + $baseY]; // 计算实际位置
+        });
+        const tetrominoHgt = tetrominoVertRange[1] - tetrominoVertRange[0] + 1;
+
+        // 算底
+        const map = {};
+        const bottomTiles = [];
+        realPos.forEach(e => {
+            const x = e[0];
+            const y = e[1];
+            map[x] ? map[x][1] < y && (map[x][1] = y) : map[x] = [...e];
+        });
+        Object.keys(map).forEach(e => bottomTiles.push([...map[e]]));
+        // console.log('算出来的底部是: ', bottomTiles, '实时的块位置： ', realPos);
+        
+        // 计算是否块下有障碍物了
+        let shouldUpdate = false;
+        bottomTiles.forEach(e => {
+            !shouldUpdate && $baseY + tetrominoHgt >= this.$vertCount && (shouldUpdate = true); //是否触底
+            !shouldUpdate && $gameTiles[e[1] + 1][e[0]] && (shouldUpdate = true); // 是否某一个块的下面有东西
+        });
+
+        shouldUpdate && this.update();
+        return shouldUpdate;
+    }
+
+    /**
+     * 更新gameTiles
+    */
+    public update(): void {
+        const {$currRealPos, $gameTiles} = this;
+        $currRealPos.forEach(e => {
+            $gameTiles[e[1]][e[0]] = 'te-'+ this.$currTshape;
+        });
+
+        // 初始化控制块坐标
+        this.$baseX = ~~(this.$horzCount / 2);
+        this.$baseY = 0;
+        this.$ctrlSpr.y = 0;
+        this.$ctrlSpr.x = ~~(this.$horzCount / 2) * this.$per;
+
+        // 绘图部分
+        this.$gameTiles.forEach(row => {
+            row.forEach(e => {
+                // e.
+            })
+        })
+
+        // 重新生成一个块
+        const item = this.$nextList.dequeue();
+        this.drawElement(item[0], item[1]);
+        console.info('重新画一个', item);
+        console.log('全局?', $gameTiles);
     }
 
     /**
@@ -312,8 +460,8 @@ class Main extends egret.DisplayObjectContainer {
         this.$ctrlSpr.height = this.$per * tileCount;
         this.$ctrlSpr.x < 0 && this.moveRight(); // 如果sprite < 0 向右移一位
         const maxWdt = this.$per * this.$horzCount;
-        console.log('autoKick:', (this.$baseY + tileCount) * this.$per, maxWdt);
-        while((this.$baseY + tileCount) * this.$per > maxWdt) { // 如果sprite + baseY
+        console.log('autoKick:', (this.$baseX + tileCount) * this.$per, maxWdt);
+        while((this.$baseX + tileCount) * this.$per > maxWdt) { // 如果sprite + baseY
             this.moveLeft();
         }
     }
@@ -346,15 +494,20 @@ class Main extends egret.DisplayObjectContainer {
         if (this.$ctrlBtns[hash].start) return null;
         // 防止同时按下左右, 而且以最后按下的为主
         (hash === 37 || hash === 39) && this.$currLorR !== hash && this.$ctrlBtns[this.$currLorR] && this.$ctrlBtns[this.$currLorR].start && this.stopRepeatProc(this.$currLorR);
-        // this.$keyMap[hash].proc = this.repeatProc.bind(this, proc);
-        // egret.startTick(this.$keyMap[hash], this);
+        /* 心跳定时器 - 貌似没有interval流畅，也许是游戏太简单
+            this.$keyMap[hash].proc = this.repeatProc.bind(this, proc);
+            egret.startTick(this.$keyMap[hash], this);
+        */
         proc.call(this);
         this.tms = Date.now();
         this.$ctrlBtns[hash].tap = egret.setTimeout(() => {
             if (this.$ctrlBtns[hash].tap) {
-                this.$ctrlBtns[hash].proc = proc.bind(this);// this.repeatProc.bind(this, proc);
-                // egret.startTick(this.$ctrlBtns[hash].proc, this);
-                // this.$ctrlBtns[hash].start = true;
+                this.$ctrlBtns[hash].proc = proc.bind(this);
+                /* 心跳定时器 - 貌似没有interval流畅，也许是游戏太简单
+                    this.$ctrlBtns[hash].proc = this.repeatProc.bind(this, proc);
+                    egret.startTick(this.$ctrlBtns[hash].proc, this);
+                    this.$ctrlBtns[hash].start = true;
+                */
                  this.$ctrlBtns[hash].start = egret.setInterval(() => this.$ctrlBtns[hash].start && proc.call(this), this, 20);
                  (hash === 37 || hash === 39) && (this.$currLorR = hash);
             }
@@ -385,6 +538,8 @@ class Main extends egret.DisplayObjectContainer {
         tf.size = 14;
         this.$playground.addChild(tf);
     }
+
+
     /**
      * 处理 keydown
      * @param keyCode {number} 按键码
@@ -392,8 +547,7 @@ class Main extends egret.DisplayObjectContainer {
     public keyDownHandler(keyCode: number): void {
         switch(keyCode) {
             case 38: // up
-                const idx = ++this.$currTshapeIdx % this.$currTshapeCount;
-                this.drawElement(this.$tShapes[this.$currTshape], idx); 
+                this.rotate();
                 break;
             case 32:  // space
                 const s = Object.keys(this.$tShapes)[this.i++];
@@ -408,7 +562,8 @@ class Main extends egret.DisplayObjectContainer {
                 this.startRepeatProc(keyCode, this.moveRight);
                 break;
             case 40: // down
-                this.startRepeatProc(keyCode, this.createText);
+                // this.startRepeatProc(keyCode, this.down);
+                this.down();
             default: 
                 break;
         }
