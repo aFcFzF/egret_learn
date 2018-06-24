@@ -21,21 +21,36 @@ var Main = (function (_super) {
         _this.$playground = null; // 方块区域
         _this.$pgr = null; // 方块背景（绘制）
         _this.$gameTiles = []; // playground 里面的所有方块
+        _this.$gameTileShps = [];
+        _this.$gmTilesShp = null;
         _this.$vertCount = 0; // 垂直个数
         _this.$per = 0; // 单个块的宽高
         _this.$horzCount = 10; // 水平单个块个数
         _this.$baseX = 0; // x轴基准, 左右距离
         _this.$baseY = 0; // y轴基准，上下距离
         _this.$tShapes = null; // 所有图形的定义
-        _this.$currTshape = 'z'; // 当前控制的图形
-        _this.$currTshapeData = []; // 这是坐标数组
-        _this.$currRealPos = [];
-        _this.$currTshapeCount = 0; // 当前图形的所有分类
-        _this.$currTshapeIdx = 0; // 当前图形的下标
-        _this.$ctrlSpr = null; // 被控制的Sripte
-        _this.$ctrlTiles = []; // 被控制的shape
-        // private $ctrlTilesPos: Array<Array<number>> = []; // 暂时没用到
-        _this.$currLorR = null; // 记录已经按下的左或右，防止冲突
+        // private $currTshape: string = 'z'; // 当前控制的图形
+        // private $currTshapeData: Array<Array<number>> = []; // 这是坐标数组
+        // private $currRealPos: Array<Array<number>> = [];
+        // private $currTshapeCount: number = 0; // 当前图形的所有分类
+        // private $currTshapeIdx: number = 0; // 当前图形的下标
+        // private $currTshapeWdt: number = 0; // 当前tetromino宽度 1. 检测边界 2. 定义初始出现位置
+        // private $currTshapeHgt: number = 0; // 高度
+        // private $ctrlSpr: egret.Sprite = null; // 被控制的Sripte
+        // private $ctrlTiles: Array<egret.Shape> = []; // 被控制的shape
+        // private $currLorR: any = null; // 记录已经按下的左或右，防止冲突
+        _this.$tetromino = {
+            char: '',
+            hNum: 0,
+            vNum: 0,
+            spr: null,
+            tetData: [],
+            tetTiles: [],
+            realPos: [],
+            count: 0,
+            idx: 0,
+            hasPressKey: 0
+        };
         _this.$ctrlBtns = {
             '38': {
                 sprName: 'rotate',
@@ -143,6 +158,11 @@ var Main = (function (_super) {
             height: pgrHgt
         });
         this.$pgr.clear();
+        // 初始化控制块坐标
+        this.$baseX = ~~(this.$horzCount / 2 - 2);
+        this.$baseY = 0;
+        this.$tetromino.spr.y = 0;
+        this.$tetromino.spr.x = ~~(this.$horzCount / 2 - 2) * this.$per;
         // 绘制背景
         for (var d = 0; d < vertCount; d++) {
             for (var p = 0; p < horzCount; p++) {
@@ -165,6 +185,12 @@ var Main = (function (_super) {
         this.$pgr.drawRoundRect(-2, -2, pgrWdt + 3, pgrHgt + 3, 4);
         this.$pgr.lineStyle(1, 0xffffff, .2);
         this.$pgr.endFill();
+        // 适配游戏区域方块画布大小
+        Object.assign(this.$gmTilesShp, {
+            width: pgrWdt,
+            height: pgrHgt,
+            name: 'gmTilesShp'
+        });
         // 适配控制按钮 - 按钮组
         var ctrlGroup = this.getChildByName('btnGroup');
         ctrlGroup.width = wdt - 20;
@@ -181,38 +207,67 @@ var Main = (function (_super) {
         this.$ctrlBtns['38'].spr.x = ctrlGroup.width - 80;
         this.$ctrlBtns['38'].spr.y = 0;
     };
+    Main.prototype.drawTile = function (g, bg, cre, shw) {
+        g.clear();
+        var per = this.$per;
+        g.beginFill(bg); // 背景色
+        g.drawRect(0, 0, per, per);
+        g.beginFill(shw); // 阴影颜色
+        var mid = ~~(per * .5); // 找中点
+        g.drawCircle(mid + 2, mid + 2, per * .3); // 画圆心阴影
+        g.beginFill(cre); // 圆心颜色
+        g.drawCircle(mid, mid, per * .3); // 画圆心
+        g.endFill();
+    };
     /**
      * 绘制一个teromino
      * @param {string} char 是一个方块的元素名
      * @param {number} num 这个是要绘制的具体旋转形态
     */
-    Main.prototype.drawElement = function (char, idx) {
+    Main.prototype.drawTetromino = function (char, idx) {
         var _this = this;
         var shp = this.$tShapes[char];
         var per = this.$per;
         var _a = shp.color, bg = _a.bg, shw = _a.shw, cre = _a.cre;
-        this.$currTshape = char;
-        this.$currTshapeData = shp.shape[idx];
-        this.$currTshapeCount = shp.shape.length;
-        this.$currTshapeIdx = idx;
-        // 踢墙
-        this.autoKick(this.$currTshapeData);
-        // 画tile
-        this.$currTshapeData.forEach(function (e, i) {
-            var tile = _this.$ctrlTiles[i];
-            var g = tile.$graphics;
-            tile.x = e[0] * per;
-            tile.y = e[1] * per;
-            g.clear();
-            g.beginFill(bg); // 背景色
-            g.drawRect(0, 0, per, per);
-            g.beginFill(shw); // 阴影颜色
-            var mid = ~~(per * .5); // 找中点
-            g.drawCircle(mid + 2, mid + 2, per * .3); // 画圆心阴影
-            g.beginFill(cre); // 圆心颜色
-            g.drawCircle(mid, mid, per * .3); // 画圆心
-            g.endFill();
+        var tetData = shp.shape[idx];
+        var $tetromino = this.$tetromino;
+        Object.assign($tetromino, {
+            char: char,
+            idx: idx,
+            tetData: tetData,
+            count: shp.shape.length,
         });
+        // 计算tetromino 高度
+        var tmp = {
+            hNum: [tetData[0][0], tetData[1][0]],
+            vNum: [tetData[0][1], tetData[1][1]]
+        };
+        tetData.forEach(function (e) {
+            // 扫一遍的时候，就把高宽计算出来
+            e[0] < tmp.hNum[0] && (tmp.hNum[0] = e[0]);
+            e[0] > tmp.hNum[1] && (tmp.hNum[1] = e[0]);
+            e[1] < tmp.vNum[0] && (tmp.vNum[0] = e[1]);
+            e[1] > tmp.vNum[1] && (tmp.vNum[1] = e[1]);
+        });
+        $tetromino.hNum = tmp.hNum[1] - tmp.hNum[0] + 1;
+        $tetromino.vNum = tmp.vNum[1] - tmp.vNum[0] + 1;
+        $tetromino.spr.width = $tetromino.hNum * per;
+        $tetromino.spr.height = $tetromino.vNum * per;
+        // 踢墙
+        this.autoKick(tetData);
+        tetData.forEach(function (e, i) {
+            // 画tile
+            var x = e[0];
+            var y = e[1];
+            var per = _this.$per;
+            var tile = $tetromino.tetTiles[i];
+            tile.name = x + "_" + y;
+            tile.x = x * per;
+            tile.y = y * per;
+            var g = $tetromino.tetTiles[i].$graphics;
+            _this.drawTile(g, bg, cre, shw);
+        });
+        console.log('interface: ', $tetromino);
     };
     Main.prototype.initUi = function () {
         var _this = this;
@@ -221,24 +276,29 @@ var Main = (function (_super) {
         var texture = RES.getRes('bg_jpg');
         var wdt = this.$stage.$stageWidth;
         var hgt = this.$stage.$stageHeight;
+        bg.name = 'gamebg';
         bg.width = wdt;
         bg.height = hgt;
         bg.texture = texture;
         bg.fillMode = egret.BitmapFillMode.CLIP; //默认情况是拉伸,现改为原图
         this.addChild(bg);
-        // 始化方块区域
+        // 始化游戏区域
         var $playground = this.$playground = new egret.Sprite();
         var $pgr = this.$pgr = this.$playground.$graphics;
+        $playground.name = 'playground';
         this.addChild($playground);
+        // 初始化更新画布
+        var gmTilesShp = this.$gmTilesShp = new egret.Shape();
+        $playground.addChild(gmTilesShp);
         // 初始化控制块 
-        var spr = this.$ctrlSpr = new egret.Sprite();
-        this.$playground.addChild(spr);
-        // 初始化控制的tile
-        for (var i = 0; i < 4; i++) {
-            var tile = new egret.Shape();
-            this.$ctrlTiles.push(tile);
-            this.$ctrlSpr.addChild(tile);
+        var spr = this.$tetromino.spr = new egret.Sprite();
+        spr.name = 'tetromino';
+        for (var i = 4; i--;) {
+            var shp = new egret.Shape();
+            this.$tetromino.tetTiles.push(shp);
+            spr.addChild(shp);
         }
+        this.$playground.addChild(spr);
         // 初始化按钮
         var btnGroup = new egret.Sprite();
         btnGroup.name = 'btnGroup';
@@ -265,22 +325,32 @@ var Main = (function (_super) {
         var _this = this;
         var hCount = this.$horzCount;
         var vCount = this.$vertCount;
-        var gmTilesSprite = new egret.Sprite();
-        gmTilesSprite.name = 'gmTiles';
-        var gmTiles = this.$gameTiles = Array.from({ length: vCount }, function (row, rowIdx) { return Array.from({ length: hCount }, function (item, itemIdx) {
-            var s = new egret.Shape();
-            s.x = _this.$per * itemIdx;
-            s.y = _this.$per * rowIdx;
-            s.width = s.height = _this.$per;
-            gmTilesSprite.addChild(s);
-            return null;
-        }); });
-        this.$playground.addChild(gmTilesSprite);
+        // 生成一个游戏区shape层
+        var gmTilesSpr = new egret.Sprite();
+        gmTilesSpr.name = 'gmTileSpr';
+        var gmTiles = this.$gameTiles = Array.from({ length: vCount }, function (row, rowIdx) {
+            var rowTiles = new egret.Sprite();
+            var rowTilesRef = [];
+            rowTiles.name = "row-" + rowIdx;
+            rowTiles.x = rowTiles.y = 0;
+            _this.$gameTileShps.push(rowTilesRef);
+            gmTilesSpr.addChild(rowTiles);
+            return Array.from({ length: hCount }, function (item, itemIdx) {
+                var tileShp = new egret.Shape();
+                tileShp.name = rowIdx + "-" + itemIdx;
+                tileShp.width = tileShp.height = _this.$per;
+                tileShp.x = itemIdx * _this.$per;
+                tileShp.y = rowIdx * _this.$per;
+                rowTilesRef.push(tileShp);
+                rowTiles.addChild(tileShp);
+                return null;
+            });
+        });
+        this.$playground.addChild(gmTilesSpr);
         // 随机生成某个块
         var tShapes = this.$tShapes = RES.getRes('preDefine_json');
         var tetrominoNames = Object.keys(tShapes);
-        //const tShape = tShapes[this.$currTshape]; // 此处应然是random
-        // this.$currTshapeCount = tShape.shape.length;
+        // 生成队列 
         var nList = this.$nextList = {
             _list: [],
             dequeue: function () {
@@ -301,31 +371,46 @@ var Main = (function (_super) {
         Array.from({ length: 10 }, function (e) { return nList.enqueue(); });
         var item = nList.dequeue();
         console.log('初始化方块', item);
-        this.drawElement(item[0], item[1]);
+        this.$tetromino.tetTiles.forEach(function (e) { return e.width = e.height = _this.$per; });
+        this.drawTetromino(item[0], item[1]);
     };
     /**
      * @param {boolean=} left 是否为左边界  这里是否合成一个checkPos更好呢？一个对象 {left, right, bottom}
      * @return {boolean} 是否为边界
     */
     Main.prototype.isBorder = function (left) {
-        if (left === undefined)
-            throw new Error('必须指定是否检测左边界！');
-        var tType = this.$currTshape;
-        var idx = this.$currTshapeIdx;
-        var baseX = this.$baseX;
-        var tile0X = this.$currTshapeData[0][0]; // 这是第1个片的x轴坐标
-        var tile1X = this.$currTshapeData[1][0]; // 这是第2个片的x轴坐标
-        var range = [tile0X, tile1X]; // range是宽度范围,要深拷贝
-        this.$currTshapeData.forEach(function (e) {
-            var x = e[0];
-            x < range[0] && (range[0] = x);
-            x > range[1] && (range[1] = x);
-        });
-        if (left && range[0] + baseX <= 0)
-            return true;
-        if (!left && range[1] + baseX + 1 >= this.$horzCount)
-            return true;
-        return false;
+        var _a = this, $baseX = _a.$baseX, $baseY = _a.$baseY, $gameTiles = _a.$gameTiles, $tetromino = _a.$tetromino;
+        var realPos = $tetromino.realPos = $tetromino.tetData.map(function (e) { return [e[0] + $baseX, e[1] + $baseY]; }); // 计算实际位置
+        var _b = this.$tetromino, hNum = _b.hNum, vNum = _b.vNum;
+        if (left) {
+            if ($baseX <= 0)
+                return true;
+            // 算左面
+            var map_1 = {};
+            var leftTiles_1 = [];
+            var leftHasTile_1 = false;
+            realPos.forEach(function (e) {
+                var _a = e.slice(), x = _a[0], y = _a[1];
+                map_1[y] ? map_1[y][0] > x && (map_1[y][0] = x) : map_1[y] = e.slice();
+            });
+            Object.keys(map_1).forEach(function (e) { return leftTiles_1.push(map_1[e].slice()); });
+            leftTiles_1.some(function (e) { return $gameTiles[e[1]][e[0] - 1] && (leftHasTile_1 = true); });
+            return leftHasTile_1;
+        }
+        else {
+            if (hNum + $baseX >= this.$horzCount)
+                return true;
+            var map_2 = {};
+            var rightTiles_1 = [];
+            var rightHasTile_1 = false;
+            realPos.forEach(function (e) {
+                var _a = e.slice(), x = _a[0], y = _a[1];
+                map_2[y] ? map_2[y][0] < x && (map_2[y][0] = x) : map_2[y] = e.slice();
+            });
+            Object.keys(map_2).forEach(function (e) { return rightTiles_1.push(map_2[e].slice()); });
+            rightTiles_1.some(function (e) { return $gameTiles[e[1]][e[0] + 1] && (rightHasTile_1 = true); }); // 是否某一个块的下面有东西
+            return rightHasTile_1;
+        }
     };
     /**
      * 旋转
@@ -333,8 +418,8 @@ var Main = (function (_super) {
     Main.prototype.rotate = function () {
         if (this.checkPos())
             return;
-        var idx = ++this.$currTshapeIdx % this.$currTshapeCount;
-        this.drawElement(this.$currTshape, idx);
+        var idx = ++this.$tetromino.idx % this.$tetromino.count;
+        this.drawTetromino(this.$tetromino.char, idx);
     };
     /**
      * 向左移一位
@@ -346,9 +431,8 @@ var Main = (function (_super) {
         if (this.isBorder(true))
             return null;
         this.$baseX--;
-        this.$ctrlSpr.x -= this.$per;
-        console.log('向左移动了', this.$baseX);
-        this.checkPos();
+        this.$tetromino.spr.x -= this.$per;
+        // console.log('向左移动了', this.$baseX);
     };
     /**
      * 向右移一位
@@ -357,16 +441,15 @@ var Main = (function (_super) {
         if (this.isBorder(false))
             return null;
         this.$baseX++;
-        this.$ctrlSpr.x += this.$per;
-        console.log('向右移动了', this.$baseX);
-        this.checkPos();
+        this.$tetromino.spr.x += this.$per;
+        // console.log('向右移动了', this.$baseX);
     };
     /**
      * 向下移一位
     */
     Main.prototype.down = function () {
         var shouldUpdate = this.checkPos();
-        shouldUpdate ? console.info('可以update了') : (this.$baseY++, this.$ctrlSpr.y += this.$per);
+        shouldUpdate ? console.info('可以update了') : (this.$baseY++, this.$tetromino.spr.y += this.$per);
     };
     /**
      * 检查tetromino位置,判断是否update - 条件1: 触底， 条件2: 下面有块
@@ -374,30 +457,47 @@ var Main = (function (_super) {
     */
     Main.prototype.checkPos = function () {
         var _this = this;
-        var _a = this, $currTshapeData = _a.$currTshapeData, $baseX = _a.$baseX, $baseY = _a.$baseY, $vertCount = _a.$vertCount, $gameTiles = _a.$gameTiles;
-        var tetrominoVertRange = [$currTshapeData[0][1], $currTshapeData[1][1]];
-        var realPos = this.$currRealPos = $currTshapeData.map(function (e) {
-            e[1] < tetrominoVertRange[0] && (tetrominoVertRange[0] = e[1]); // 计算高度
-            e[1] > tetrominoVertRange[1] && (tetrominoVertRange[1] = e[1]);
-            return [e[0] + $baseX, e[1] + $baseY]; // 计算实际位置
-        });
-        var tetrominoHgt = tetrominoVertRange[1] - tetrominoVertRange[0] + 1;
+        var _a = this, $baseX = _a.$baseX, $baseY = _a.$baseY, $vertCount = _a.$vertCount, $gameTiles = _a.$gameTiles, $tetromino = _a.$tetromino;
+        var realPos = $tetromino.realPos = $tetromino.tetData.map(function (e) { return [e[0] + $baseX, e[1] + $baseY]; }); // 计算实际位置
+        var tetrominoVnum = $tetromino.vNum;
         // 算底
         var map = {};
         var bottomTiles = [];
         realPos.forEach(function (e) {
-            var x = e[0];
-            var y = e[1];
+            var _a = e.slice(), x = _a[0], y = _a[1];
             map[x] ? map[x][1] < y && (map[x][1] = y) : map[x] = e.slice();
         });
         Object.keys(map).forEach(function (e) { return bottomTiles.push(map[e].slice()); });
-        // console.log('算出来的底部是: ', bottomTiles, '实时的块位置： ', realPos);
+        // // 算左面
+        // map = {};
+        // const leftTiles = [];
+        // realPos.forEach(e => {
+        //     const [x, y] = [...e];
+        //     map[y] ? map[y][0] > x && (map[y][0] = x) : map[y] = [...e];
+        // });
+        // Object.keys(map).forEach(e => leftTiles.push([...map[e]]));
+        // 算右面
+        // map = {};
+        // const rightTiles = [];
+        // realPos.forEach(e => {
+        //     const [x, y] = [...e];
+        //     map[y] ? map[y][0] < x && (map[y][0] = x) : map[y] = [...e];
+        // });
+        // Object.keys(map).forEach(e => rightTiles.push([...map[e]]));
+        console.log('算出来的底面是: ', bottomTiles);
+        // console.log('算出来的左面是: ', leftTiles);
+        // console.log('算出来的右面是: ', rightTiles);
         // 计算是否块下有障碍物了
         var shouldUpdate = false;
-        bottomTiles.forEach(function (e) {
-            !shouldUpdate && $baseY + tetrominoHgt >= _this.$vertCount && (shouldUpdate = true); //是否触底
+        bottomTiles.some(function (e) {
+            $baseY + tetrominoVnum >= _this.$vertCount && (shouldUpdate = true); //是否触底
             !shouldUpdate && $gameTiles[e[1] + 1][e[0]] && (shouldUpdate = true); // 是否某一个块的下面有东西
+            return shouldUpdate;
         });
+        // // 计算左面是否有障碍物
+        // !shouldUpdate && leftTiles.some(e => $gameTiles[e[1]][e[0] - 1] && (shouldUpdate = true)); // 是否某一个块的下面有东西
+        // // 计算右面是否有障碍物
+        // !shouldUpdate && rightTiles.some(e => $gameTiles[e[1]][e[0] + 1] && (shouldUpdate = true)); // 是否某一个块的下面有东西
         shouldUpdate && this.update();
         return shouldUpdate;
     };
@@ -406,24 +506,28 @@ var Main = (function (_super) {
     */
     Main.prototype.update = function () {
         var _this = this;
-        var _a = this, $currRealPos = _a.$currRealPos, $gameTiles = _a.$gameTiles;
-        $currRealPos.forEach(function (e) {
-            $gameTiles[e[1]][e[0]] = 'te-' + _this.$currTshape;
+        var _a = this, $tetromino = _a.$tetromino, $gameTiles = _a.$gameTiles;
+        $tetromino.realPos.forEach(function (e) {
+            $gameTiles[e[1]][e[0]] = 'te-' + $tetromino.char;
         });
         // 初始化控制块坐标
         this.$baseX = ~~(this.$horzCount / 2);
         this.$baseY = 0;
-        this.$ctrlSpr.y = 0;
-        this.$ctrlSpr.x = ~~(this.$horzCount / 2) * this.$per;
+        $tetromino.spr.y = 0;
+        $tetromino.spr.x = ~~(this.$horzCount / 2) * this.$per;
         // 绘图部分
-        this.$gameTiles.forEach(function (row) {
-            row.forEach(function (e) {
-                // e.
+        this.$gameTiles.forEach(function (row, rowIdx) {
+            return row.forEach(function (item, itemIdx) {
+                if (item === null)
+                    return;
+                var char = item.split('-')[1];
+                var _a = _this.$tShapes[char].color, bg = _a.bg, cre = _a.cre, shw = _a.shw;
+                _this.drawTile(_this.$gameTileShps[rowIdx][itemIdx].$graphics, bg, cre, shw);
             });
         });
         // 重新生成一个块
         var item = this.$nextList.dequeue();
-        this.drawElement(item[0], item[1]);
+        this.drawTetromino(item[0], item[1]);
         console.info('重新画一个', item);
         console.log('全局?', $gameTiles);
     };
@@ -433,20 +537,14 @@ var Main = (function (_super) {
      * @inner
     */
     Main.prototype.autoKick = function (tShapeData) {
-        var range = [tShapeData[0][0], tShapeData[1][0]]; // 第一个片和第二个片的坐标
-        tShapeData.forEach(function (e) {
-            var x = e[0];
-            x < range[0] && (range[0] = x);
-            x > range[1] && (range[1] = x);
-        });
-        var tileCount = range[1] - range[0] + 1; // 加一是因为俩x坐标的差最小是1，那么至少占1格，比如长条
-        this.$ctrlSpr.width = this.$per * tileCount;
-        this.$ctrlSpr.height = this.$per * tileCount;
-        this.$ctrlSpr.x < 0 && this.moveRight(); // 如果sprite < 0 向右移一位
-        var maxWdt = this.$per * this.$horzCount;
-        console.log('autoKick:', (this.$baseX + tileCount) * this.$per, maxWdt);
-        while ((this.$baseX + tileCount) * this.$per > maxWdt) {
+        var _a = this, $tetromino = _a.$tetromino, $per = _a.$per, $baseY = _a.$baseY, $horzCount = _a.$horzCount, $vertCount = _a.$vertCount;
+        var hNum = $tetromino.hNum;
+        var sprPosX = $tetromino.spr.x;
+        sprPosX < 0 && this.moveRight(); // 如果sprite < 0 向右移一位
+        var maxWdt = $per * $horzCount;
+        while ((this.$baseX + hNum) * $per > maxWdt) {
             this.moveLeft();
+            console.log('autoKick:', (this.$baseX + hNum) * $per, maxWdt);
         }
     };
     Main.prototype.repeatProc = function (proc) {
@@ -465,7 +563,7 @@ var Main = (function (_super) {
         if (this.$ctrlBtns[hash].start)
             return null;
         // 防止同时按下左右, 而且以最后按下的为主
-        (hash === 37 || hash === 39) && this.$currLorR !== hash && this.$ctrlBtns[this.$currLorR] && this.$ctrlBtns[this.$currLorR].start && this.stopRepeatProc(this.$currLorR);
+        (hash === 37 || hash === 39) && this.$tetromino.hasPressKey !== hash && this.$ctrlBtns[this.$tetromino.hasPressKey] && this.$ctrlBtns[this.$tetromino.hasPressKey].start && this.stopRepeatProc(this.$tetromino.hasPressKey);
         /* 心跳定时器 - 貌似没有interval流畅，也许是游戏太简单
             this.$keyMap[hash].proc = this.repeatProc.bind(this, proc);
             egret.startTick(this.$keyMap[hash], this);
@@ -481,7 +579,7 @@ var Main = (function (_super) {
                     this.$ctrlBtns[hash].start = true;
                 */
                 _this.$ctrlBtns[hash].start = egret.setInterval(function () { return _this.$ctrlBtns[hash].start && proc.call(_this); }, _this, 20);
-                (hash === 37 || hash === 39) && (_this.$currLorR = hash);
+                (hash === 37 || hash === 39) && (_this.$tetromino.hasPressKey = hash);
             }
         }, this, 80);
     };
@@ -489,7 +587,7 @@ var Main = (function (_super) {
      * 停止长按点击
     */
     Main.prototype.stopRepeatProc = function (hash) {
-        this.createText.call(this, Date.now() - this.tms);
+        // this.createText.call(this, Date.now() - this.tms)
         egret.clearTimeout(this.$ctrlBtns[hash].tap);
         this.$ctrlBtns[hash].tap = null;
         if (!this.hasRepeat(hash))
@@ -518,10 +616,10 @@ var Main = (function (_super) {
                 this.rotate();
                 break;
             case 32:// space
-                var s = Object.keys(this.$tShapes)[this.i++];
-                this.$currTshape = s;
-                this.$currTshapeIdx = 0;
-                this.$currTshapeCount = this.$tShapes[this.$currTshape].shape.length;
+                // const s = Object.keys(this.$tShapes)[this.i++];
+                // this.$currTshape = s;
+                // this.$currTshapeIdx = 0;
+                // this.$currTshapeCount = this.$tShapes[this.$currTshape].shape.length;
                 break;
             case 37:// left
                 this.startRepeatProc(keyCode, this.moveLeft);
