@@ -10,8 +10,10 @@
 		"libsrc/bin/particle/particle.js"
 	],
 	"game": [
+		"bin-debug/Flash.js",
 		"bin-debug/LoadingUI.js",
 		"bin-debug/Main.js",
-		"bin-debug/Platform.js"
+		"bin-debug/Platform.js",
+		"bin-debug/Score.js"
 	]
 }

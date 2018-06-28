@@ -1,7 +1,7 @@
 {
 	"groups": [
 		{
-			"keys": "bg_jpg,egret_icon_png,description_json,stone_png,t_json,stoneDown_json,aa_json,tetris_bg_jpg,bg_test_png,bg_test2_png,preDefine_json,rotate_down_png,left_png,left_down_png,right_png,right_down_png,rotate_png,hard_down_png,down_png",
+			"keys": "bg_jpg,egret_icon_png,description_json,stone_png,t_json,stoneDown_json,aa_json,tetris_bg_jpg,bg_test_png,bg_test2_png,preDefine_json,rotate_down_png,left_png,left_down_png,right_png,right_down_png,rotate_png,hard_down_png,down_png,newParticle_json,level0_png,level1_png,level2_png",
 			"name": "preload"
 		}
 	],
@@ -106,6 +106,36 @@
 			"url": "assets/btns/down.png",
 			"type": "image",
 			"name": "down_png"
+		},
+		{
+			"url": "assets/newParticle.json",
+			"type": "json",
+			"name": "newParticle_json"
+		},
+		{
+			"url": "assets/preDefine.png",
+			"type": "image",
+			"name": "preDefine_png"
+		},
+		{
+			"url": "assets/newParticle.png",
+			"type": "image",
+			"name": "newParticle_png"
+		},
+		{
+			"url": "assets/level0.png",
+			"type": "image",
+			"name": "level0_png"
+		},
+		{
+			"url": "assets/level1.png",
+			"type": "image",
+			"name": "level1_png"
+		},
+		{
+			"url": "assets/level2.png",
+			"type": "image",
+			"name": "level2_png"
 		}
 	]
 }

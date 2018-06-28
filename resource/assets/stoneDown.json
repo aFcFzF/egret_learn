@@ -15,7 +15,7 @@
 ,"blendFactorDestination":"oneMinusSourceAlpha"
 ,"rotatePerSecondVariance":10
 ,"endSize":80
-,"startSize":80
+,"startSize":0
 ,"endSizeVariance":0
 ,"startBlueVariance":0
 ,"endAlphaVariance":0
