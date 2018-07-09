@@ -23,6 +23,15 @@ interface ParticleEffect {
     task: Array<Array<number>>;
 }
 
+interface PreviewBox {
+    container: egret.Sprite;
+    previewItems: Array<egret.Sprite>;
+    tetQueue: any;
+    previewItemShps: Array<Array<Array<egret.Shape>>>;
+    rowCount: number;
+    previewItemY: Array<number>;
+}
+
 class Main extends egret.DisplayObjectContainer {
     public constructor() {
         super();
@@ -30,7 +39,7 @@ class Main extends egret.DisplayObjectContainer {
     }
 
     private $textPos: number = 0;
-    private $bg: egret.Bitmap = null; // 背景
+    public $bg: egret.Bitmap = null; // 背景
     private $playground: egret.Sprite = null; // 方块区域
     private $pgr: egret.Graphics = null; // 方块背景（绘制）
     private $gameTiles: Array<Array<any>> = []; // playground 里面的所有方块
@@ -43,6 +52,15 @@ class Main extends egret.DisplayObjectContainer {
     private $baseX: number = 0; // x轴基准, 左右距离
     private $baseY: number = 0; // y轴基准，上下距离
     private $tShapes: Object = null; // 所有图形的定义
+    public $gmFont: any = null;
+    private $previewBox: PreviewBox = {
+        container: null,
+        previewItems: [],
+        tetQueue: null,
+        previewItemShps: [],
+        rowCount: 4,
+        previewItemY: []
+    }
     // private $currTshape: string = 'z'; // 当前控制的图形
     // private $currTshapeData: Array<Array<number>> = []; // 这是坐标数组
     // private $currRealPos: Array<Array<number>> = [];
@@ -78,45 +96,54 @@ class Main extends egret.DisplayObjectContainer {
         '38': {
             sprName: 'rotate',
             spr: null,
-            bg: 'rotate_png',
+            bg: 'rotate',
             start: false,
             proc: null,
-            tap: null 
+            tap: null,
+            sound: 'rotation_mp3'
         },
         '40': {
             sprName: 'down',
             spr: null,
-            bg: 'down_png',
+            bg: 'down',
+            bitmap: null,
             start: false,
             proc: null,
-            tap: null
+            tap: null,
+            sound: 'down_mp3'
         },
-        // 'undefin': {
-        //     sprName: 'hardDown',
-        //     spr: null,
-        //     bg: 'hard_down_png',
-        //     start: false,
-        //     proc: null,
-        //     tap: null
-        // },
+        '88': {
+            sprName: 'hardDown',
+            spr: null,
+            bg: 'hard_down',
+            bitmap: null,
+            start: false,
+            proc: null,
+            tap: null,
+            sound: 'fastDown_mp3'
+        },
         '37': {
             sprName: 'left',
             spr: null,
-            bg: 'left_png',
+            bg: 'left',
             start: false,
             proc: null,
-            tap: null
+            tap: null,
+            sound: 'action_mp3'
         },
         '39': {
             sprName: 'right',
             spr: null,
-            bg: 'right_png',
+            bg: 'right',
+            bitmap: null,
             start: false,
             proc: null,
-            tap: null
+            tap: null,
+            sound: 'action_mp3'
         }
     };
-    private $nextList: any = null;
+
+    private $strategy: TetStrategy;
     
 
     public init() {
@@ -164,8 +191,8 @@ class Main extends egret.DisplayObjectContainer {
         });
 
         // 计算游戏区域
-        let pgrWdt = wdt - 100;
-        let pgrHgt = hgt - 120;
+        let pgrWdt = wdt - 120;
+        let pgrHgt = hgt - 160;
         const horzCount = this.$horzCount;
         let per = this.$per = ~~(pgrWdt / horzCount);
         let vertCount = ~~(pgrHgt / per);
@@ -175,7 +202,7 @@ class Main extends egret.DisplayObjectContainer {
         console.log('宽和高： ', pgrWdt, pgrHgt);
         Object.assign(this.$playground, {
             x: 10,
-            y: 10,
+            y: 70, // 相当于增加了60
             width: pgrWdt,
             height: pgrHgt
         });
@@ -211,6 +238,50 @@ class Main extends egret.DisplayObjectContainer {
         this.$pgr.lineStyle(1, 0xffffff, .2);
         this.$pgr.endFill();
 
+
+        // 计算预览区域
+        const pvBox = this.$previewBox;
+        const pvContainer = pvBox.container;
+        const pvItems = pvBox.previewItems;
+        const rowCount = pvBox.rowCount;
+        const pvWdt = 90;
+        const pvHgt = 270;
+        
+        Object.assign(pvContainer, {
+            x: pgrWdt + 20,
+            y: 70,
+            width: pvWdt,
+            height: pvHgt
+        });
+        const pvg = pvContainer.$graphics;
+        pvg.clear();
+        pvg.lineStyle(3, 0xffffff, .8);
+        pvg.beginFill(0x0, .4);
+        pvg.drawRoundRect(-2, -2, pvWdt + 3, pvHgt + 3, 4);
+        pvg.endFill();
+
+        pvItems.forEach((e, i) => {
+            e.x = 10;
+            this.$previewBox.previewItemY[i] = e.y = 20 + 10 * (i + 1) + i * 70;
+            const g = e.$graphics;
+            g.clear();
+            g.lineStyle(0);
+            g.drawRoundRect(0, 0, 70, 70, 3);
+            const ItemPer = ~~(70 / rowCount);
+            const container = Array.from({length: 4}, (row, rowIdx) => {
+                const rows = Array.from({length: 4}, (item, itemIdx) =>{
+                    const p = new egret.Shape();
+                    p.width = p.height = ItemPer;
+                    p.x = rowIdx * ItemPer;
+                    p.y = itemIdx * ItemPer;
+                    e.addChild(p);
+                    return p; 
+                });
+                return rows;
+            });
+            this.$previewBox.previewItemShps.push(container);
+        });
+
         // 适配游戏区域方块画布大小
         Object.assign(this.$gmTilesShp, {
             width: pgrWdt,
@@ -224,15 +295,15 @@ class Main extends egret.DisplayObjectContainer {
         const span = ~~((ctrlGroup.width - 4 * 80) / 5);
         ctrlGroup.height = 2 * 80 + span;
         ctrlGroup.x = 10;
-        ctrlGroup.y = ~~(pgrHgt + 10 + (hgt - 10 - pgrHgt) / 2) - ~~((ctrlGroup.height - span) * 3 / 4) - 10;
+        ctrlGroup.y = ~~(pgrHgt + 70 + (hgt - 70 - pgrHgt) / 2) - ~~((ctrlGroup.height - span) * 3 / 4) - 10;
         const btnCount = 4;
-        ['37', '39', '40'].forEach((e, idx) => {
+        ['37', '39', '38', '40'].forEach((e, idx) => {
             console.log('距离', (span + 80) * idx);
             this.$ctrlBtns[e].spr.x = (span + 80) * idx;
             this.$ctrlBtns[e].spr.y = span + 80;
         });
-        this.$ctrlBtns['38'].spr.x = ctrlGroup.width - 80;
-        this.$ctrlBtns['38'].spr.y = 0;
+        this.$ctrlBtns['88'].spr.x = ctrlGroup.width - 80;
+        this.$ctrlBtns['88'].spr.y = 0;
         
     }
 
@@ -241,10 +312,10 @@ class Main extends egret.DisplayObjectContainer {
             const per = this.$per;
             scale  = scale || 1;
             g.beginFill(bg); // 背景色
-            g.drawRect(0, 0, per * scale, per);
+            g.drawRect(0, 0, per * scale, per * scale);
             g.beginFill(shw); // 阴影颜色
             const mid = ~~(per * scale * .5); // 找中点
-            g.drawCircle(mid + 2, mid + 2, per * .3); // 画圆心阴影
+            g.drawCircle(mid + 2, mid + 2, per * scale * .3); // 画圆心阴影
             g.beginFill(cre); // 圆心颜色
             g.drawCircle(mid, mid, per * scale * .3); // 画圆心
             g.endFill();
@@ -314,6 +385,9 @@ class Main extends egret.DisplayObjectContainer {
         bg.fillMode = egret.BitmapFillMode.CLIP; //默认情况是拉伸,现改为原图
         this.addChild(bg);
 
+        // 初始化字体
+        this.$gmFont = RES.getRes('gameFont_fnt');
+
         // 始化游戏区域
         const $playground = this.$playground = new egret.Sprite();
         const $pgr = this.$pgr = this.$playground.$graphics;
@@ -323,6 +397,17 @@ class Main extends egret.DisplayObjectContainer {
         // 初始化更新画布
         const gmTilesShp = this.$gmTilesShp = new egret.Shape();
         $playground.addChild(gmTilesShp);
+
+        // 初始化 方块预览
+        const pvContainer = this.$previewBox.container = new egret.Sprite();
+        pvContainer.name = 'previewBox';
+        Array.from({length: 3}, (e, i) => {
+            const previewItem = new egret.Sprite();
+            previewItem.name = `previewItem_${i}`;
+            pvContainer.addChild(previewItem);
+            this.$previewBox.previewItems.push(previewItem);
+        });
+        this.addChild(pvContainer);
 
         // 初始化控制块 
         const spr = this.$tetromino.spr = new egret.Sprite();
@@ -341,14 +426,14 @@ class Main extends egret.DisplayObjectContainer {
             const btnItem = this.$ctrlBtns[e];
             btnItem.spr = new egret.Sprite();
             btnItem.spr.name = btnItem.sprName;
-            btnItem.bg = new egret.Bitmap(RES.getRes(this.$ctrlBtns[e].bg));
-            btnItem.bg.fillMode = egret.BitmapFillMode.SCALE;
-            btnItem.spr.width = btnItem.bg.width = 80;
-            btnItem.spr.height = btnItem.bg.height = 80;
+            btnItem.bitmap = new egret.Bitmap(RES.getRes(btnItem.bg + '_png'));
+            btnItem.bitmap.fillMode = egret.BitmapFillMode.SCALE;
+            btnItem.spr.width = btnItem.bitmap.width = ~~(hgt / 8);
+            btnItem.spr.height = btnItem.bitmap.height = ~~(hgt / 8);
             btnItem.spr.touchEnabled = true;
             btnItem.spr.addEventListener(egret.TouchEvent.TOUCH_BEGIN, this.keyDownHandler.bind(this, +e), this);
             btnItem.spr.addEventListener(egret.TouchEvent.TOUCH_END, this.keyUpHandler.bind(this, +e), this);
-            btnItem.spr.addChild(btnItem.bg);
+            btnItem.spr.addChild(btnItem.bitmap);
             btnGroup.addChild(btnItem.spr);
         });
         this.addChild(btnGroup);
@@ -391,7 +476,7 @@ class Main extends egret.DisplayObjectContainer {
         const tetrominoNames = Object.keys(tShapes);
 
         // 生成队列 
-        const nList = this.$nextList = {
+        const nList = this.$previewBox.tetQueue = {
             _list: [],
 
             dequeue() {
@@ -408,17 +493,25 @@ class Main extends egret.DisplayObjectContainer {
 
             size() {
                 return this._list.length;
+            },
+
+            list() {
+                return this._list;
             }
         }
 
         // 生成随方块队列-10个
         Array.from({length: 10}, e => nList.enqueue());
 
-        const item = nList.dequeue();
-        console.log('初始化方块', item);
-        this.$tetromino.tetTiles.forEach(e => e.width = e.height = this.$per);
-        this.drawTetromino(item[0], item[1]);
+        this.updatePreview();
 
+        const previewText = new egret.BitmapText();
+        previewText.font = this.$gmFont;
+        previewText.x = 5;
+        previewText.y = 5;
+        previewText.scaleX = previewText.scaleY = .3; // 64 * 0.x
+        previewText.text = 'NEXT';
+        this.$previewBox.container.addChild(previewText);
 
         const partBox = this.$particleEffect.partBox = new egret.Sprite();
         partBox.name = 'partBox';
@@ -449,12 +542,107 @@ class Main extends egret.DisplayObjectContainer {
         partBox.addChild(part);
         this.$playground.addChild(partBox);
 
-        const strategy = new TetStrategy();
-        strategy.start();
+        const strategy = this.$strategy = new TetStrategy(this);
+
+        const countDownText = new egret.BitmapText();
+        Object.assign(countDownText, {
+                font: this.$gmFont,
+                text: '0' + 3,
+                scaleX: .6,
+                scaleY: .6
+        });
+
+        let x = ~~(this.$playground.width / 2) - ~~(countDownText.width * .6 / 2);
+        const y = ~~(this.$playground.height / 2) - ~~(countDownText.height / 2);
+        RES.getRes('321_mp3').play(0, 1);
+        Object.assign(countDownText, {
+                x,
+                y: y - 100,
+                alpha: 0,
+        });
+        this.$playground.addChild(countDownText);
+
+        egret.Tween.get(countDownText).to({
+            alpha: 1,
+            y
+        }, 800, egret.Ease.bounceOut)
+        .call(() => {
+            countDownText.text = '02';
+        }, this)
+        .to({
+            x,
+            y: y - 100,
+            alpha: 0,
+        }, 0)
+        .to({
+            alpha: 1,
+            y
+        }, 800, egret.Ease.bounceOut)
+        .call(() => {
+            countDownText.text = '01';
+        }, this)
+        .to({
+            x,
+            y: y - 100,
+            alpha: 0,
+        }, 0)
+        .to({
+            alpha: 1,
+            y
+        }, 800, egret.Ease.bounceOut)
+        .call(() => {
+            countDownText.text = 'GO!';
+            x = ~~(this.$playground.width / 2) - ~~(countDownText.width * .6 / 2);
+        }, this)
+        .to({
+            x,
+            y: y - 100,
+            alpha: 0,
+        }, 0)
+        .to({
+            alpha: 1,
+            y
+        }, 800, egret.Ease.bounceOut)
+        .call(() => {
+            strategy.start();
+        }, this)
+        .to({
+            alpha: 0
+        }, 100);
+
+        // strategy.start();
 
         // this.$particleEffect.partSys.x = 0;
         // this.$particleEffect.partSys.y = 10;
         // part.start();
+    }
+
+    updatePreview() {
+        const {tetQueue, previewItemShps, rowCount} = this.$previewBox;
+
+        this.$previewBox.previewItems.forEach((e, i) => {
+            const list = tetQueue.list();
+            const [char, idx] = list[i];
+            const {shape, color} = this.$tShapes[char];
+            const tetData = shape[idx];
+            const {bg, cre, shw} = color;
+            const perItem = +(70 / rowCount).toFixed(2);
+
+            const {hNum, vNum} = this.calcWH(tetData);
+
+            e.x = +((70 - hNum * perItem) / 2).toFixed(2) + 10;
+            e.y = +((70 - vNum * perItem) / 2).toFixed(2) + this.$previewBox.previewItemY[i];
+
+            previewItemShps[i].forEach(a => a.forEach(b => b.$graphics.clear()));
+
+            tetData.forEach((item, itemIdx) => {
+                const [x, y] = item;
+                const g = previewItemShps[i][x][y].$graphics;
+                const scale = (perItem / this.$per).toFixed(2);
+                this.drawTile(g, bg, cre, shw, +scale);
+            });
+            
+        });
     }
 
 
@@ -607,16 +795,17 @@ class Main extends egret.DisplayObjectContainer {
         $tetromino.spr.y = 0;
         $tetromino.spr.x = ~~(this.$horzCount / 2) * this.$per;
 
-
         // 重新生成一个块
-        const item = this.$nextList.dequeue();
+        const item = this.$previewBox.tetQueue.dequeue();
         this.drawTetromino(item[0], item[1]);
         // console.info('重新画一个', item);
         // console.log('全局?', $gameTiles);
+
+        this.updatePreview();
     }
 
     public cleanUp() {
-        const {$gameTiles, $gameTileShps, $tShapes, $gameTileSprs, $particleEffect, $per, $horzCount} = this;
+        const {$gameTiles, $gameTileShps, $tShapes, $gameTileSprs, $particleEffect, $per, $horzCount, $strategy} = this;
         const fullLine = [];
         const ranges = [];
         let r = [];
@@ -651,6 +840,8 @@ class Main extends egret.DisplayObjectContainer {
                 emitAngleVariance: hgt,
                 texture: $particleEffect.txrs[level]
             });
+
+            this.$strategy.addScore(num);
 
             $particleEffect.partSys.start();
             egret.setTimeout(() => {
@@ -805,7 +996,6 @@ class Main extends egret.DisplayObjectContainer {
             egret.startTick(this.$keyMap[hash], this);
         */
         proc.call(this);
-        this.tms = Date.now();
         this.$ctrlBtns[hash].tap = egret.setTimeout(() => {
             if (this.$ctrlBtns[hash].tap) {
                 this.$ctrlBtns[hash].proc = proc.bind(this);
@@ -814,7 +1004,19 @@ class Main extends egret.DisplayObjectContainer {
                     egret.startTick(this.$ctrlBtns[hash].proc, this);
                     this.$ctrlBtns[hash].start = true;
                 */
-                 this.$ctrlBtns[hash].start = egret.setInterval(() => this.$ctrlBtns[hash].start && proc.call(this), this, 20);
+                 const interval = {
+                    '38': 300,
+                    '40': 20,
+                    '37': 20,
+                    '39': 20
+                 }
+                 this.$ctrlBtns[hash].start = egret.setInterval(() => {
+                    this.$ctrlBtns[hash].start && proc.call(this);
+                    const sound: egret.Sound = RES.getRes(this.$ctrlBtns[hash]['sound']);
+                    const control = sound.play(0, 1);
+                    hash === 40 && (control.volume = .2);
+
+                }, this, interval[hash]);
                  (hash === 37 || hash === 39) && (this.$tetromino.hasPressKey = hash);
             }
         }, this, 80);
@@ -851,9 +1053,13 @@ class Main extends egret.DisplayObjectContainer {
      * @param keyCode {number} 按键码
     */
     public keyDownHandler(keyCode: number): void {
+        this.$ctrlBtns[keyCode].bitmap.texture = RES.getRes(this.$ctrlBtns[keyCode]['bg'] + '_press_png');
+        const sound: egret.Sound = RES.getRes(this.$ctrlBtns[keyCode]['sound']);
+        sound.play(0, 1);
         switch(keyCode) {
             case 38: // up
-                this.rotate();
+                // this.rotate();
+                this.startRepeatProc(keyCode, this.rotate);
                 break;
             case 32:  // space
                 // const s = Object.keys(this.$tShapes)[this.i++];
@@ -868,8 +1074,8 @@ class Main extends egret.DisplayObjectContainer {
                 this.startRepeatProc(keyCode, this.moveRight);
                 break;
             case 40: // down
-                // this.startRepeatProc(keyCode, this.down);
-                this.down();
+                this.startRepeatProc(keyCode, this.down);
+                // this.down();
             default: 
                 break;
         }
@@ -877,6 +1083,7 @@ class Main extends egret.DisplayObjectContainer {
 
     // keyup
     public keyUpHandler(keyCode: number): void {
+        this.$ctrlBtns[keyCode].bitmap.texture = RES.getRes(this.$ctrlBtns[keyCode]['bg'] + '_png');
         this.stopRepeatProc(keyCode);
     }
 }

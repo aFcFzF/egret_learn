@@ -30,6 +30,15 @@ var Main = (function (_super) {
         _this.$baseX = 0; // x轴基准, 左右距离
         _this.$baseY = 0; // y轴基准，上下距离
         _this.$tShapes = null; // 所有图形的定义
+        _this.$gmFont = null;
+        _this.$previewBox = {
+            container: null,
+            previewItems: [],
+            tetQueue: null,
+            previewItemShps: [],
+            rowCount: 4,
+            previewItemY: []
+        };
         // private $currTshape: string = 'z'; // 当前控制的图形
         // private $currTshapeData: Array<Array<number>> = []; // 这是坐标数组
         // private $currRealPos: Array<Array<number>> = [];
@@ -62,45 +71,52 @@ var Main = (function (_super) {
             '38': {
                 sprName: 'rotate',
                 spr: null,
-                bg: 'rotate_png',
+                bg: 'rotate',
                 start: false,
                 proc: null,
-                tap: null
+                tap: null,
+                sound: 'rotation_mp3'
             },
             '40': {
                 sprName: 'down',
                 spr: null,
-                bg: 'down_png',
+                bg: 'down',
+                bitmap: null,
                 start: false,
                 proc: null,
-                tap: null
+                tap: null,
+                sound: 'down_mp3'
             },
-            // 'undefin': {
-            //     sprName: 'hardDown',
-            //     spr: null,
-            //     bg: 'hard_down_png',
-            //     start: false,
-            //     proc: null,
-            //     tap: null
-            // },
+            '88': {
+                sprName: 'hardDown',
+                spr: null,
+                bg: 'hard_down',
+                bitmap: null,
+                start: false,
+                proc: null,
+                tap: null,
+                sound: 'fastDown_mp3'
+            },
             '37': {
                 sprName: 'left',
                 spr: null,
-                bg: 'left_png',
+                bg: 'left',
                 start: false,
                 proc: null,
-                tap: null
+                tap: null,
+                sound: 'action_mp3'
             },
             '39': {
                 sprName: 'right',
                 spr: null,
-                bg: 'right_png',
+                bg: 'right',
+                bitmap: null,
                 start: false,
                 proc: null,
-                tap: null
+                tap: null,
+                sound: 'action_mp3'
             }
         };
-        _this.$nextList = null;
         // /**
         //  * @param {Array} tetData 下一个图形的data
         //  * @inner
@@ -165,8 +181,8 @@ var Main = (function (_super) {
             height: hgt
         });
         // 计算游戏区域
-        var pgrWdt = wdt - 100;
-        var pgrHgt = hgt - 120;
+        var pgrWdt = wdt - 120;
+        var pgrHgt = hgt - 160;
         var horzCount = this.$horzCount;
         var per = this.$per = ~~(pgrWdt / horzCount);
         var vertCount = ~~(pgrHgt / per);
@@ -176,7 +192,7 @@ var Main = (function (_super) {
         console.log('宽和高： ', pgrWdt, pgrHgt);
         Object.assign(this.$playground, {
             x: 10,
-            y: 10,
+            y: 70,
             width: pgrWdt,
             height: pgrHgt
         });
@@ -208,6 +224,46 @@ var Main = (function (_super) {
         this.$pgr.drawRoundRect(-2, -2, pgrWdt + 3, pgrHgt + 3, 4);
         this.$pgr.lineStyle(1, 0xffffff, .2);
         this.$pgr.endFill();
+        // 计算预览区域
+        var pvBox = this.$previewBox;
+        var pvContainer = pvBox.container;
+        var pvItems = pvBox.previewItems;
+        var rowCount = pvBox.rowCount;
+        var pvWdt = 90;
+        var pvHgt = 270;
+        Object.assign(pvContainer, {
+            x: pgrWdt + 20,
+            y: 70,
+            width: pvWdt,
+            height: pvHgt
+        });
+        var pvg = pvContainer.$graphics;
+        pvg.clear();
+        pvg.lineStyle(3, 0xffffff, .8);
+        pvg.beginFill(0x0, .4);
+        pvg.drawRoundRect(-2, -2, pvWdt + 3, pvHgt + 3, 4);
+        pvg.endFill();
+        pvItems.forEach(function (e, i) {
+            e.x = 10;
+            _this.$previewBox.previewItemY[i] = e.y = 20 + 10 * (i + 1) + i * 70;
+            var g = e.$graphics;
+            g.clear();
+            g.lineStyle(0);
+            g.drawRoundRect(0, 0, 70, 70, 3);
+            var ItemPer = ~~(70 / rowCount);
+            var container = Array.from({ length: 4 }, function (row, rowIdx) {
+                var rows = Array.from({ length: 4 }, function (item, itemIdx) {
+                    var p = new egret.Shape();
+                    p.width = p.height = ItemPer;
+                    p.x = rowIdx * ItemPer;
+                    p.y = itemIdx * ItemPer;
+                    e.addChild(p);
+                    return p;
+                });
+                return rows;
+            });
+            _this.$previewBox.previewItemShps.push(container);
+        });
         // 适配游戏区域方块画布大小
         Object.assign(this.$gmTilesShp, {
             width: pgrWdt,
@@ -220,25 +276,25 @@ var Main = (function (_super) {
         var span = ~~((ctrlGroup.width - 4 * 80) / 5);
         ctrlGroup.height = 2 * 80 + span;
         ctrlGroup.x = 10;
-        ctrlGroup.y = ~~(pgrHgt + 10 + (hgt - 10 - pgrHgt) / 2) - ~~((ctrlGroup.height - span) * 3 / 4) - 10;
+        ctrlGroup.y = ~~(pgrHgt + 70 + (hgt - 70 - pgrHgt) / 2) - ~~((ctrlGroup.height - span) * 3 / 4) - 10;
         var btnCount = 4;
-        ['37', '39', '40'].forEach(function (e, idx) {
+        ['37', '39', '38', '40'].forEach(function (e, idx) {
             console.log('距离', (span + 80) * idx);
             _this.$ctrlBtns[e].spr.x = (span + 80) * idx;
             _this.$ctrlBtns[e].spr.y = span + 80;
         });
-        this.$ctrlBtns['38'].spr.x = ctrlGroup.width - 80;
-        this.$ctrlBtns['38'].spr.y = 0;
+        this.$ctrlBtns['88'].spr.x = ctrlGroup.width - 80;
+        this.$ctrlBtns['88'].spr.y = 0;
     };
     Main.prototype.drawTile = function (g, bg, cre, shw, scale) {
         g.clear();
         var per = this.$per;
         scale = scale || 1;
         g.beginFill(bg); // 背景色
-        g.drawRect(0, 0, per * scale, per);
+        g.drawRect(0, 0, per * scale, per * scale);
         g.beginFill(shw); // 阴影颜色
         var mid = ~~(per * scale * .5); // 找中点
-        g.drawCircle(mid + 2, mid + 2, per * .3); // 画圆心阴影
+        g.drawCircle(mid + 2, mid + 2, per * scale * .3); // 画圆心阴影
         g.beginFill(cre); // 圆心颜色
         g.drawCircle(mid, mid, per * scale * .3); // 画圆心
         g.endFill();
@@ -304,6 +360,8 @@ var Main = (function (_super) {
         bg.texture = texture;
         bg.fillMode = egret.BitmapFillMode.CLIP; //默认情况是拉伸,现改为原图
         this.addChild(bg);
+        // 初始化字体
+        this.$gmFont = RES.getRes('gameFont_fnt');
         // 始化游戏区域
         var $playground = this.$playground = new egret.Sprite();
         var $pgr = this.$pgr = this.$playground.$graphics;
@@ -312,6 +370,16 @@ var Main = (function (_super) {
         // 初始化更新画布
         var gmTilesShp = this.$gmTilesShp = new egret.Shape();
         $playground.addChild(gmTilesShp);
+        // 初始化 方块预览
+        var pvContainer = this.$previewBox.container = new egret.Sprite();
+        pvContainer.name = 'previewBox';
+        Array.from({ length: 3 }, function (e, i) {
+            var previewItem = new egret.Sprite();
+            previewItem.name = "previewItem_" + i;
+            pvContainer.addChild(previewItem);
+            _this.$previewBox.previewItems.push(previewItem);
+        });
+        this.addChild(pvContainer);
         // 初始化控制块 
         var spr = this.$tetromino.spr = new egret.Sprite();
         spr.name = 'tetromino';
@@ -328,14 +396,14 @@ var Main = (function (_super) {
             var btnItem = _this.$ctrlBtns[e];
             btnItem.spr = new egret.Sprite();
             btnItem.spr.name = btnItem.sprName;
-            btnItem.bg = new egret.Bitmap(RES.getRes(_this.$ctrlBtns[e].bg));
-            btnItem.bg.fillMode = egret.BitmapFillMode.SCALE;
-            btnItem.spr.width = btnItem.bg.width = 80;
-            btnItem.spr.height = btnItem.bg.height = 80;
+            btnItem.bitmap = new egret.Bitmap(RES.getRes(btnItem.bg + '_png'));
+            btnItem.bitmap.fillMode = egret.BitmapFillMode.SCALE;
+            btnItem.spr.width = btnItem.bitmap.width = ~~(hgt / 8);
+            btnItem.spr.height = btnItem.bitmap.height = ~~(hgt / 8);
             btnItem.spr.touchEnabled = true;
             btnItem.spr.addEventListener(egret.TouchEvent.TOUCH_BEGIN, _this.keyDownHandler.bind(_this, +e), _this);
             btnItem.spr.addEventListener(egret.TouchEvent.TOUCH_END, _this.keyUpHandler.bind(_this, +e), _this);
-            btnItem.spr.addChild(btnItem.bg);
+            btnItem.spr.addChild(btnItem.bitmap);
             btnGroup.addChild(btnItem.spr);
         });
         this.addChild(btnGroup);
@@ -374,7 +442,7 @@ var Main = (function (_super) {
         var tShapes = this.$tShapes = RES.getRes('preDefine_json');
         var tetrominoNames = Object.keys(tShapes);
         // 生成队列 
-        var nList = this.$nextList = {
+        var nList = this.$previewBox.tetQueue = {
             _list: [],
             dequeue: function () {
                 this.enqueue();
@@ -388,14 +456,21 @@ var Main = (function (_super) {
             },
             size: function () {
                 return this._list.length;
+            },
+            list: function () {
+                return this._list;
             }
         };
         // 生成随方块队列-10个
         Array.from({ length: 10 }, function (e) { return nList.enqueue(); });
-        var item = nList.dequeue();
-        console.log('初始化方块', item);
-        this.$tetromino.tetTiles.forEach(function (e) { return e.width = e.height = _this.$per; });
-        this.drawTetromino(item[0], item[1]);
+        this.updatePreview();
+        var previewText = new egret.BitmapText();
+        previewText.font = this.$gmFont;
+        previewText.x = 5;
+        previewText.y = 5;
+        previewText.scaleX = previewText.scaleY = .3; // 64 * 0.x
+        previewText.text = 'NEXT';
+        this.$previewBox.container.addChild(previewText);
         var partBox = this.$particleEffect.partBox = new egret.Sprite();
         partBox.name = 'partBox';
         var playGroundWdt = this.$per * this.$horzCount;
@@ -404,14 +479,6 @@ var Main = (function (_super) {
             y: 0,
             width: playGroundWdt,
         });
-        // Object.assign(particleBox, {
-        //     name: "particleBox",
-        //     x: 30,
-        //     y: 10,
-        //     height: 100,
-        //     width: 300
-        // });
-        // this.$playground.addChild(particleBox);
         var txrs = [];
         for (var i = 0; i < 3; i++) {
             var txr = RES.getRes("level" + i + "_png");
@@ -428,9 +495,96 @@ var Main = (function (_super) {
         });
         partBox.addChild(part);
         this.$playground.addChild(partBox);
+        var strategy = this.$strategy = new TetStrategy(this);
+        var countDownText = new egret.BitmapText();
+        Object.assign(countDownText, {
+            font: this.$gmFont,
+            text: '0' + 3,
+            scaleX: .6,
+            scaleY: .6
+        });
+        var x = ~~(this.$playground.width / 2) - ~~(countDownText.width * .6 / 2);
+        var y = ~~(this.$playground.height / 2) - ~~(countDownText.height / 2);
+        RES.getRes('321_mp3').play(0, 1);
+        Object.assign(countDownText, {
+            x: x,
+            y: y - 100,
+            alpha: 0,
+        });
+        this.$playground.addChild(countDownText);
+        egret.Tween.get(countDownText).to({
+            alpha: 1,
+            y: y
+        }, 800, egret.Ease.bounceOut)
+            .call(function () {
+            countDownText.text = '02';
+        }, this)
+            .to({
+            x: x,
+            y: y - 100,
+            alpha: 0,
+        }, 0)
+            .to({
+            alpha: 1,
+            y: y
+        }, 800, egret.Ease.bounceOut)
+            .call(function () {
+            countDownText.text = '01';
+        }, this)
+            .to({
+            x: x,
+            y: y - 100,
+            alpha: 0,
+        }, 0)
+            .to({
+            alpha: 1,
+            y: y
+        }, 800, egret.Ease.bounceOut)
+            .call(function () {
+            countDownText.text = 'GO!';
+            x = ~~(_this.$playground.width / 2) - ~~(countDownText.width * .6 / 2);
+        }, this)
+            .to({
+            x: x,
+            y: y - 100,
+            alpha: 0,
+        }, 0)
+            .to({
+            alpha: 1,
+            y: y
+        }, 800, egret.Ease.bounceOut)
+            .call(function () {
+            strategy.start();
+        }, this)
+            .to({
+            alpha: 0
+        }, 100);
+        // strategy.start();
         // this.$particleEffect.partSys.x = 0;
         // this.$particleEffect.partSys.y = 10;
         // part.start();
+    };
+    Main.prototype.updatePreview = function () {
+        var _this = this;
+        var _a = this.$previewBox, tetQueue = _a.tetQueue, previewItemShps = _a.previewItemShps, rowCount = _a.rowCount;
+        this.$previewBox.previewItems.forEach(function (e, i) {
+            var list = tetQueue.list();
+            var _a = list[i], char = _a[0], idx = _a[1];
+            var _b = _this.$tShapes[char], shape = _b.shape, color = _b.color;
+            var tetData = shape[idx];
+            var bg = color.bg, cre = color.cre, shw = color.shw;
+            var perItem = +(70 / rowCount).toFixed(2);
+            var _c = _this.calcWH(tetData), hNum = _c.hNum, vNum = _c.vNum;
+            e.x = +((70 - hNum * perItem) / 2).toFixed(2) + 10;
+            e.y = +((70 - vNum * perItem) / 2).toFixed(2) + _this.$previewBox.previewItemY[i];
+            previewItemShps[i].forEach(function (a) { return a.forEach(function (b) { return b.$graphics.clear(); }); });
+            tetData.forEach(function (item, itemIdx) {
+                var x = item[0], y = item[1];
+                var g = previewItemShps[i][x][y].$graphics;
+                var scale = (perItem / _this.$per).toFixed(2);
+                _this.drawTile(g, bg, cre, shw, +scale);
+            });
+        });
     };
     /**
      * @param {boolean=} left 是否为左边界  这里是否合成一个checkPos更好呢？一个对象 {left, right, bottom}
@@ -571,14 +725,15 @@ var Main = (function (_super) {
         $tetromino.spr.y = 0;
         $tetromino.spr.x = ~~(this.$horzCount / 2) * this.$per;
         // 重新生成一个块
-        var item = this.$nextList.dequeue();
+        var item = this.$previewBox.tetQueue.dequeue();
         this.drawTetromino(item[0], item[1]);
         // console.info('重新画一个', item);
         // console.log('全局?', $gameTiles);
+        this.updatePreview();
     };
     Main.prototype.cleanUp = function () {
         var _this = this;
-        var _a = this, $gameTiles = _a.$gameTiles, $gameTileShps = _a.$gameTileShps, $tShapes = _a.$tShapes, $gameTileSprs = _a.$gameTileSprs, $particleEffect = _a.$particleEffect, $per = _a.$per, $horzCount = _a.$horzCount;
+        var _a = this, $gameTiles = _a.$gameTiles, $gameTileShps = _a.$gameTileShps, $tShapes = _a.$tShapes, $gameTileSprs = _a.$gameTileSprs, $particleEffect = _a.$particleEffect, $per = _a.$per, $horzCount = _a.$horzCount, $strategy = _a.$strategy;
         var fullLine = [];
         var ranges = [];
         var r = [];
@@ -606,6 +761,7 @@ var Main = (function (_super) {
                 emitAngleVariance: hgt,
                 texture: $particleEffect.txrs[level]
             });
+            _this.$strategy.addScore(num);
             $particleEffect.partSys.start();
             egret.setTimeout(function () {
                 _this.$particleEffect.partSys.stop();
@@ -714,7 +870,6 @@ var Main = (function (_super) {
             egret.startTick(this.$keyMap[hash], this);
         */
         proc.call(this);
-        this.tms = Date.now();
         this.$ctrlBtns[hash].tap = egret.setTimeout(function () {
             if (_this.$ctrlBtns[hash].tap) {
                 _this.$ctrlBtns[hash].proc = proc.bind(_this);
@@ -723,7 +878,18 @@ var Main = (function (_super) {
                     egret.startTick(this.$ctrlBtns[hash].proc, this);
                     this.$ctrlBtns[hash].start = true;
                 */
-                _this.$ctrlBtns[hash].start = egret.setInterval(function () { return _this.$ctrlBtns[hash].start && proc.call(_this); }, _this, 20);
+                var interval = {
+                    '38': 300,
+                    '40': 20,
+                    '37': 20,
+                    '39': 20
+                };
+                _this.$ctrlBtns[hash].start = egret.setInterval(function () {
+                    _this.$ctrlBtns[hash].start && proc.call(_this);
+                    var sound = RES.getRes(_this.$ctrlBtns[hash]['sound']);
+                    var control = sound.play(0, 1);
+                    hash === 40 && (control.volume = .2);
+                }, _this, interval[hash]);
                 (hash === 37 || hash === 39) && (_this.$tetromino.hasPressKey = hash);
             }
         }, this, 80);
@@ -756,9 +922,13 @@ var Main = (function (_super) {
      * @param keyCode {number} 按键码
     */
     Main.prototype.keyDownHandler = function (keyCode) {
+        this.$ctrlBtns[keyCode].bitmap.texture = RES.getRes(this.$ctrlBtns[keyCode]['bg'] + '_press_png');
+        var sound = RES.getRes(this.$ctrlBtns[keyCode]['sound']);
+        sound.play(0, 1);
         switch (keyCode) {
             case 38:// up
-                this.rotate();
+                // this.rotate();
+                this.startRepeatProc(keyCode, this.rotate);
                 break;
             case 32:// space
                 // const s = Object.keys(this.$tShapes)[this.i++];
@@ -773,14 +943,15 @@ var Main = (function (_super) {
                 this.startRepeatProc(keyCode, this.moveRight);
                 break;
             case 40:// down
-                // this.startRepeatProc(keyCode, this.down);
-                this.down();
+                this.startRepeatProc(keyCode, this.down);
+            // this.down();
             default:
                 break;
         }
     };
     // keyup
     Main.prototype.keyUpHandler = function (keyCode) {
+        this.$ctrlBtns[keyCode].bitmap.texture = RES.getRes(this.$ctrlBtns[keyCode]['bg'] + '_png');
         this.stopRepeatProc(keyCode);
     };
     return Main;
