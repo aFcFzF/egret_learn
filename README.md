@@ -1,3 +1,4 @@
 # egret_learn
 egret tetris
-手机端： http://jsplayer.cn/tetris
+---
+![缩略图](./thumb.png)
