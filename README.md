@@ -2,4 +2,4 @@
 ---
 ![缩略图](./thumb.png)
 
-主要文件嘛。。看src/main.ts就可以了
+主要文看src/main.ts
